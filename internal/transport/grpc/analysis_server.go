@@ -2,9 +2,8 @@ package grpc
 
 import (
 	"context"
-	"strconv"
 
-	run2 "github.com/pulsoats/analysis/internal/model/run"
+	"github.com/pulsoats/analysis/internal/model/run"
 	"github.com/pulsoats/analysis/internal/transport/grpc/errorx"
 	analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
 	"github.com/rs/zerolog"
@@ -15,10 +14,10 @@ import (
 
 type AnalysisServer struct {
 	analysispb.UnimplementedAnalysisServiceServer
-	runUC run2.Service
+	runUC run.Service
 }
 
-func NewAnalysisServer(runUC run2.Service) *AnalysisServer {
+func NewAnalysisServer(runUC run.Service) *AnalysisServer {
 	return &AnalysisServer{runUC: runUC}
 }
 
@@ -47,7 +46,7 @@ func (s *AnalysisServer) StartRun(ctx context.Context, req *analysispb.StartRunR
 		return nil, status.Errorf(codes.Internal, "%v", err)
 	}
 
-	return &analysispb.StartRunResponse{RunId: strconv.FormatInt(runID, 10)}, nil
+	return &analysispb.StartRunResponse{RunId: runID}, nil
 }
 
 func (s *AnalysisServer) GetRunStatus(ctx context.Context, req *analysispb.GetRunRequest) (*analysispb.GetRunStatusResponse, error) {
@@ -57,14 +56,8 @@ func (s *AnalysisServer) GetRunStatus(ctx context.Context, req *analysispb.GetRu
 		return nil, status.Error(codes.InvalidArgument, "nil request")
 	}
 
-	logger = logger.With().Str("run_id", req.GetRunId()).Logger()
-
-	runID, err := strconv.ParseInt(req.RunId, 10, 64)
-	if err != nil {
-		logger.Warn().Err(err).Msg("invalid run id")
-		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	logger = logger.With().Str("run_id", req.RunId).Logger()
+	runID := req.GetRunId()
+	logger = logger.With().Int64("run_id", runID).Logger()
 
 	runStatus, err := s.runUC.Status(ctx, runID)
 	if err != nil {
@@ -94,13 +87,8 @@ func (s *AnalysisServer) GetRunMeta(ctx context.Context, req *analysispb.GetRunR
 		return nil, status.Error(codes.InvalidArgument, "nil request")
 	}
 
-	logger = logger.With().Str("run_id", req.GetRunId()).Logger()
-	runID, err := strconv.ParseInt(req.RunId, 10, 64)
-	if err != nil {
-		logger.Warn().Err(err).Msg("invalid run id")
-		return nil, status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	logger = logger.With().Str("run_id", req.RunId).Logger()
+	runID := req.GetRunId()
+	logger = logger.With().Int64("run_id", runID).Logger()
 
 	meta, err := s.runUC.FindByID(ctx, runID)
 	if err != nil {
@@ -114,7 +102,7 @@ func (s *AnalysisServer) GetRunMeta(ctx context.Context, req *analysispb.GetRunR
 	}
 
 	logger.Info().
-		Str("run_id", req.GetRunId()).
+		Int64("run_id", runID).
 		Msg("returning run meta")
 
 	return mapRunMeta(meta), nil
@@ -127,14 +115,8 @@ func (s *AnalysisServer) GetRunResult(req *analysispb.GetRunRequest, stream anal
 		return status.Error(codes.InvalidArgument, "nil request")
 	}
 
-	logger = logger.With().Str("run_id", req.GetRunId()).Logger()
-
-	runID, err := strconv.ParseInt(req.RunId, 10, 64)
-	if err != nil {
-		logger.Warn().Err(err).Msg("invalid run id")
-		return status.Errorf(codes.InvalidArgument, "%v", err)
-	}
-	logger = logger.With().Str("run_id", req.RunId).Logger()
+	runID := req.GetRunId()
+	logger = logger.With().Int64("run_id", runID).Logger()
 
 	runStatus, err := s.runUC.Status(stream.Context(), runID)
 	if err != nil {
@@ -150,7 +132,7 @@ func (s *AnalysisServer) GetRunResult(req *analysispb.GetRunRequest, stream anal
 		Int("status", runStatus.Code).
 		Msg("fetched run status for result streaming")
 
-	if runStatus.Code != run2.StatusDone {
+	if runStatus.Code != run.StatusDone {
 		logger.Warn().Msg("run result not ready")
 		return status.Error(codes.FailedPrecondition, "run result not ready")
 	}

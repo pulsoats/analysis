@@ -3,9 +3,8 @@ package grpc
 import (
 	"errors"
 	"fmt"
-	"strconv"
 
-	run2 "github.com/pulsoats/analysis/internal/model/run"
+	"github.com/pulsoats/analysis/internal/model/run"
 	analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
 	commonpb "github.com/pulsoats/contracts/gen/go/common/v1"
 	"github.com/pulsoats/core/domain/derrors"
@@ -14,27 +13,27 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func mapStartRunRequest(req *analysispb.StartRunRequest) (run2.Request, error) {
+func mapStartRunRequest(req *analysispb.StartRunRequest) (run.Request, error) {
 	if req == nil {
-		return run2.Request{}, errors.New("nil request")
+		return run.Request{}, errors.New("nil request")
 	}
 	if req.Market == nil {
-		return run2.Request{}, errors.New("market is required")
+		return run.Request{}, errors.New("market is required")
 	}
 
 	interval, ok := market.ParseInterval(req.Interval)
 	if !ok {
-		return run2.Request{}, fmt.Errorf("%w: interval %v", derrors.ErrInvalidArgument, req.Interval)
+		return run.Request{}, fmt.Errorf("%w: interval %v", derrors.ErrInvalidArgument, req.Interval)
 	}
 
 	category := market.Category(req.Market.Category)
 
 	detector, err := mapDetectorsRequest(req.Detector)
 	if err != nil {
-		return run2.Request{}, err
+		return run.Request{}, err
 	}
 
-	return run2.Request{
+	return run.Request{
 		UserID: req.UserId,
 		Market: market.Spec{
 			Exchange: req.Market.Exchange,
@@ -74,22 +73,22 @@ func mapFeesRequest(f *commonpb.Fees) *market.TakerMakerFees {
 
 func mapRunStatusCode(code int) analysispb.RunStatus {
 	switch code {
-	case run2.StatusPending:
+	case run.StatusPending:
 		return analysispb.RunStatus_RUN_STATUS_PENDING
-	case run2.StatusRunning:
+	case run.StatusRunning:
 		return analysispb.RunStatus_RUN_STATUS_RUNNING
-	case run2.StatusDone:
+	case run.StatusDone:
 		return analysispb.RunStatus_RUN_STATUS_DONE
-	case run2.StatusFailed:
+	case run.StatusFailed:
 		return analysispb.RunStatus_RUN_STATUS_FAILED
 	default:
 		return analysispb.RunStatus_RUN_STATUS_UNSPECIFIED
 	}
 }
 
-func mapRunMeta(r run2.Run) *analysispb.RunMeta {
+func mapRunMeta(r run.Run) *analysispb.RunMeta {
 	meta := &analysispb.RunMeta{
-		RunId:        strconv.FormatInt(r.ID, 10),
+		Id:           r.ID,
 		Status:       mapRunStatusCode(r.Status.Code),
 		UserId:       r.CreatedBy,
 		Market:       mapMarketSpec(r.Market),
