@@ -1,0 +1,74 @@
+# =====================
+# OS
+# =====================
+.DS_Store
+Thumbs.db
+
+# =====================
+# Go
+# =====================
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries
+*.test
+
+# Coverage
+*.out
+
+# Go workspace
+go.work
+go.work.sum
+
+# =====================
+# Build / runtime
+# =====================
+bin/
+dist/
+build/
+tmp/
+
+# =====================
+# Environment
+# =====================
+.env
+.env.*
+*.local
+
+# =====================
+# IDE / Editors
+# =====================
+# JetBrains (GoLand, IntelliJ)
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# =====================
+# Logs
+# =====================
+*.log
+
+# =====================
+# Database / local data
+# =====================
+*.db
+*.sqlite
+*.sqlite3
+data/
+
+# =====================
+# Archives / exports
+# =====================
+*.zip
+*.tar.gz
+
+# =====================
+# Generated files
+# =====================
+*.generated.*
