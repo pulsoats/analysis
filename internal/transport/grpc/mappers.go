@@ -3,6 +3,7 @@ package grpc
 import (
 	"errors"
 	"fmt"
+	"strconv"
 
 	"github.com/pulsoats/analysis/internal/model/run"
 	analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
@@ -88,7 +89,7 @@ func mapRunStatusCode(code int) analysispb.RunStatus {
 
 func mapRunMeta(r run.Run) *analysispb.RunMeta {
 	meta := &analysispb.RunMeta{
-		Id:           r.ID,
+		Id:           strconv.FormatInt(r.ID, 10),
 		Status:       mapRunStatusCode(r.Status.Code),
 		UserId:       r.CreatedBy,
 		Market:       mapMarketSpec(r.Market),

@@ -3,7 +3,7 @@ package grpc
 import analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
 
 type grpcWriter struct {
-	stream analysispb.AnalysisService_GetRunResultServer
+	stream analysispb.Analysis_GetRunResultServer
 }
 
 func (w *grpcWriter) Write(p []byte) (int, error) {

@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-func RunGRPCServer(ctx context.Context, addr string, analysisSrv analysispb.AnalysisServiceServer) error {
+func RunGRPCServer(ctx context.Context, addr string, analysisSrv analysispb.AnalysisServer) error {
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func RunGRPCServer(ctx context.Context, addr string, analysisSrv analysispb.Anal
 	)
 	reflection.Register(server)
 
-	analysispb.RegisterAnalysisServiceServer(server, analysisSrv)
+	analysispb.RegisterAnalysisServer(server, analysisSrv)
 
 	if ctx != nil {
 		go func() {
