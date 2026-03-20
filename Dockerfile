@@ -5,19 +5,38 @@
 ########################
 FROM golang:1.25.3 AS builder
 
+ARG GITHUB_PAT
+ENV GOPRIVATE=github.com/pulsoats/* \
+    GONOSUMDB=github.com/pulsoats/* \
+    GONOPROXY=github.com/pulsoats/*
+
 WORKDIR /src
 
-# зависимости и vendor
+# зависимости
 COPY go.mod go.sum ./
-COPY vendor ./vendor
+
+# скачивание модулей (нужен до копирования остального кода для кэширования слоя)
+RUN --mount=type=cache,target=/go/pkg/mod \
+    if [ -n "${GITHUB_PAT:-}" ]; then \
+        printf "machine github.com\nlogin %s\npassword x-oauth-basic\n" "$GITHUB_PAT" > /root/.netrc; \
+        chmod 600 /root/.netrc; \
+    fi; \
+    go mod download; \
+    rm -f /root/.netrc
 
 # код
 COPY . .
 
-# сборка через vendor
+# сборка бинаря; если передан PAT, он берётся из build-arg
 RUN --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/go/pkg/mod \
+    if [ -n "${GITHUB_PAT:-}" ]; then \
+        printf "machine github.com\nlogin %s\npassword x-oauth-basic\n" "$GITHUB_PAT" > /root/.netrc; \
+        chmod 600 /root/.netrc; \
+    fi; \
     CGO_ENABLED=1 GOOS=linux GOARCH=amd64 \
-    go build -mod=vendor -o /out/analysis-service ./cmd
+    go build -o /out/analysis-service ./cmd; \
+    rm -f /root/.netrc
 
 ########################
 # Runtime
