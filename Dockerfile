@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
         printf "machine github.com\nlogin %s\npassword x-oauth-basic\n" "$GITHUB_TOKEN" > /root/.netrc; \
         chmod 600 /root/.netrc; \
     fi; \
-    CGO_ENABLED=1 GOOS=linux GOARCH=amd64 go build -o /out/analysis-service ./cmd; \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/analysis-service ./cmd; \
     rm -f /root/.netrc
 
 FROM debian:bookworm-slim

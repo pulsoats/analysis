@@ -167,6 +167,8 @@ func (r *repo) RunByID(ctx context.Context, runID int64) (run.Run, error) {
 	return res, nil
 }
 
+func (r *repo) ListByUserID
+
 func nullTime(t time.Time) *time.Time {
 	if t.IsZero() {
 		return nil
