@@ -167,6 +167,86 @@ func (r *repo) RunByID(ctx context.Context, runID int64) (run.Run, error) {
 	return res, nil
 }
 
+func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *int64) ([]run.Run, bool, *int64, error) {
+	const query = `
+		SELECT
+			id,
+			exchange,
+			category,
+			symbol,
+			interval,
+			detector_code,
+			detector_label,
+			detector_opts,
+			from_time,
+			to_time,
+			signals_count,
+			avg_profit_ppm,
+			created_by,
+			created_at,
+			status_code,
+			status_message
+		FROM analysis.runs
+		WHERE ($1::bigint IS NULL OR id < $1)
+		ORDER BY id DESC
+		LIMIT $2;
+	`
+
+	rows, err := r.pool.Query(ctx, query, beforeID, limit+1)
+	if err != nil {
+		return nil, false, nil, fmt.Errorf("list runs paged: %w: %v", errorsx.ErrInternal, err)
+	}
+	defer rows.Close()
+
+	runs, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (run.Run, error) {
+		var newRun run.Run
+		var rawInterval string
+
+		if err := row.Scan(
+			&newRun.ID,
+			&newRun.Market.Exchange,
+			&newRun.Market.Category,
+			&newRun.Market.Symbol,
+			&rawInterval,
+			&newRun.Detector.Code,
+			&newRun.Detector.Label,
+			&newRun.Detector.Opts,
+			&newRun.From,
+			&newRun.To,
+			&newRun.SignalsCount,
+			&newRun.AvgProfitPPM,
+			&newRun.CreatedBy,
+			&newRun.CreatedAt,
+			&newRun.Status.Code,
+			&newRun.Status.Message,
+		); err != nil {
+			return run.Run{}, err
+		}
+
+		if iv, ok := market.ParseInterval(rawInterval); ok {
+			newRun.Interval = iv
+		}
+
+		return newRun, nil
+	})
+	if err != nil {
+		return nil, false, nil, fmt.Errorf("collect runs paged: %w: %v", errorsx.ErrInternal, err)
+	}
+
+	hasMore := len(runs) > limit
+	if hasMore {
+		runs = runs[:limit]
+	}
+
+	var nextBeforeID *int64
+	if hasMore && len(runs) > 0 {
+		lastID := runs[len(runs)-1].ID
+		nextBeforeID = &lastID
+	}
+
+	return runs, hasMore, nextBeforeID, nil
+}
+
 func nullTime(t time.Time) *time.Time {
 	if t.IsZero() {
 		return nil

@@ -52,6 +52,7 @@ type Repository interface {
 	UpdateResult(ctx context.Context, res Run) error
 	StatusByRunID(ctx context.Context, runID int64) (Status, error)
 	RunByID(ctx context.Context, runID int64) (Run, error)
+	ListRunsPaged(ctx context.Context, limit int, beforeID *int64) ([]Run, bool, *int64, error)
 }
 
 type Service interface {
@@ -59,4 +60,5 @@ type Service interface {
 	Status(ctx context.Context, runID int64) (Status, error)
 	StreamRunResult(ctx context.Context, runID int64, w io.Writer) error
 	FindByID(ctx context.Context, runID int64) (Run, error)
+	ListRunsPaged(ctx context.Context, limit int, beforeID *int64) ([]Run, bool, *int64, error)
 }

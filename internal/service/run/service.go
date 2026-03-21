@@ -132,6 +132,10 @@ func (s *service) FindByID(ctx context.Context, runID int64) (run.Run, error) {
 	return r, nil
 }
 
+func (s *service) ListRunsPaged(ctx context.Context, limit int, beforeID *int64) ([]run.Run, bool, *int64, error) {
+	return s.repo.ListRunsPaged(ctx, limit, beforeID)
+}
+
 func (s *service) executeRun(ctx context.Context, runID int64, cfg run.Request) error {
 	if cfg.Fees == nil {
 		return fmt.Errorf("execute run: %w: fees config", derrors.ErrRequired)

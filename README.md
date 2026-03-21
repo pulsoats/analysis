@@ -9,8 +9,8 @@
 - кэширование исторических свечей в PostgreSQL для повторного использования.
 
 ## Поток обработки
-1. gRPC вызывает `StartRun`, `internal/transport/grpc` мапит protobuf в `internal/model/run.Request`.
-2. `internal/service/run.Service` валидирует параметры и создаёт запись в `analysis_runs` со статусом `pending`, затем в фоне запускает вычисление.
+1. gRPC вызывает `StartRun`, `internal/transport/grpc` мапит protobuf в `internal/model/newRun.Request`.
+2. `internal/service/newRun.Service` валидирует параметры и создаёт запись в `analysis_runs` со статусом `pending`, затем в фоне запускает вычисление.
 3. Во время вычисления сервис:
    - получает нужные свечи через зарегистрированные биржевые API (`github.com/pulsoats/core/exchanges`), сначала проверяя кэш `analysis_candles`;
    - строит детектор из `pulsoats/core/detect` и гоняет его на последовательности свечей;
@@ -19,11 +19,11 @@
 4. Финальный статус `done` или `failed` обновляется в `analysis_runs`, а архив лежит в `ANALYSIS_STORAGE_DIR`.
 
 - `cmd/main.go` — точка входа: логгер (`zerolog`), пул PostgreSQL (`pgxpool`), регистры детекторов и бирж, gRPC сервер;
-- `internal/service/run` — доменная логика бэктеста, работа с `detectors.Registry`, singleflight-кэш для свечей и сбор ZIP;
+- `internal/service/newRun` — доменная логика бэктеста, работа с `detectors.Registry`, singleflight-кэш для свечей и сбор ZIP;
 - `internal/infrastructure/repository/postgres` — хранилище запусков (`runs.Repository`) и локальный кэш свечей (`candles.Repository`);
 - `internal/detect` — адаптер ядра `pulsoats/core/detect`;
 - `internal/transport/grpc` — сервер `analysis.v1.AnalysisService`, error mapping и стриминг архива;
-- `internal/utils/files` — генераторы CSV/ZIP, используются `service.run`.
+- `internal/utils/files` — генераторы CSV/ZIP, используются `service.newRun`.
 
 ## Конфигурация
 - `POSTGRES_DSN` — обязательный DSN подключения;
@@ -45,7 +45,7 @@
 ## Структура репозитория
 ```
 cmd/                    входной бинарь
-internal/service/run    бизнес-логика бэктеста
+internal/service/newRun    бизнес-логика бэктеста
 internal/transport      gRPC сервер и мапперы
 internal/infrastructure доступ к PostgreSQL
 internal/utils/files    генерация CSV/ZIP

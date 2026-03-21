@@ -14,6 +14,11 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	defaultListRunsLimit = 20
+	maxListRunsLimit     = 100
+)
+
 type AnalysisServer struct {
 	analysispb.UnimplementedAnalysisServer
 	runUC run.Service
@@ -30,7 +35,7 @@ func (s *AnalysisServer) StartRun(ctx context.Context, req *analysispb.StartRunR
 		return nil, status.Error(codes.InvalidArgument, "nil request")
 	}
 
-	logger.Info().
+	logger.Debug().
 		Str("user_id", req.GetUserId()).
 		Str("exchange", req.GetMarket().GetExchange()).
 		Str("symbol", req.GetMarket().GetSymbol()).
@@ -80,7 +85,7 @@ func (s *AnalysisServer) GetRunStatus(ctx context.Context, req *analysispb.GetRu
 		return nil, st.Err()
 	}
 
-	logger.Info().
+	logger.Debug().
 		Int("status", runStatus.Code).
 		Msg("returning run status")
 
@@ -119,7 +124,7 @@ func (s *AnalysisServer) GetRunMeta(ctx context.Context, req *analysispb.GetRunR
 		return nil, st.Err()
 	}
 
-	logger.Info().
+	logger.Debug().
 		Int64("run_id", runID).
 		Msg("returning run meta")
 
@@ -154,7 +159,7 @@ func (s *AnalysisServer) GetRunResult(req *analysispb.GetRunRequest, stream anal
 		}
 		return st.Err()
 	}
-	logger.Info().
+	logger.Debug().
 		Int("status", runStatus.Code).
 		Msg("fetched run status for result streaming")
 
@@ -169,7 +174,7 @@ func (s *AnalysisServer) GetRunResult(req *analysispb.GetRunRequest, stream anal
 		return status.Errorf(codes.Internal, "%v", err)
 	}
 
-	logger.Info().Msg("run result stream completed")
+	logger.Debug().Msg("run result stream completed")
 	return nil
 }
 
@@ -177,6 +182,63 @@ func grpcLogger(method string) zerolog.Logger {
 	return log.With().
 		Str("grpc_method", method).
 		Logger()
+}
+
+func (s *AnalysisServer) ListRunsPaged(ctx context.Context, req *analysispb.ListRunsRequest) (*analysispb.ListRunsResponse, error) {
+	logger := grpcLogger("ListRunsPaged")
+	if req == nil {
+		logger.Warn().Msg("nil request received")
+		return nil, status.Error(codes.InvalidArgument, "nil request")
+	}
+
+	limit := req.GetLimit()
+	switch {
+	case limit <= 0:
+		limit = defaultListRunsLimit
+	case limit > maxListRunsLimit:
+		limit = maxListRunsLimit
+	}
+	logger = logger.With().Int32("limit", limit).Logger()
+
+	beforeIDRaw := req.GetBeforeId()
+	var beforeID *int64
+	if beforeIDRaw < 0 {
+		logger.Warn().Int64("before_id", beforeIDRaw).Msg("before_id must be positive")
+		return nil, status.Error(codes.InvalidArgument, "before_id must be positive")
+	}
+	if beforeIDRaw != 0 {
+		beforeID = &beforeIDRaw
+		logger = logger.With().Int64("before_id", beforeIDRaw).Logger()
+	}
+
+	runs, hasMore, nextBeforeID, err := s.runUC.ListRunsPaged(ctx, int(limit), beforeID)
+	if err != nil {
+		st := errorx.ToStatus(err)
+		if st.Code() == codes.NotFound {
+			logger.Warn().Err(err).Msg("runs page not found")
+		} else {
+			logger.Error().Err(err).Msg("failed to list runs")
+		}
+		return nil, st.Err()
+	}
+
+	resp := &analysispb.ListRunsResponse{
+		Items:   make([]*analysispb.RunMeta, 0, len(runs)),
+		HasMore: hasMore,
+	}
+	for _, r := range runs {
+		resp.Items = append(resp.Items, mapRunMeta(r))
+	}
+	if nextBeforeID != nil {
+		resp.NextBeforeId = *nextBeforeID
+	}
+
+	logger.Debug().
+		Int("items", len(resp.Items)).
+		Bool("has_more", hasMore).
+		Int64("next_before_id", resp.GetNextBeforeId()).
+		Msg("returning paged runs")
+	return resp, nil
 }
 
 func parseRunID(runID string) (int64, error) {
