@@ -32,7 +32,7 @@ type Run struct {
 	From         time.Time
 	To           time.Time
 	SignalsCount int64
-	AvgProfitPPM int64
+	AvgProfitPPM *int64
 	CreatedBy    string
 	CreatedAt    time.Time
 	Status       Status

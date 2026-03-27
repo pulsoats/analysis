@@ -191,7 +191,7 @@ func (s *service) executeRun(ctx context.Context, runID int64, cfg run.Request) 
 		From:         fromBound,
 		To:           toBound,
 		SignalsCount: int64(len(res.signals)),
-		AvgProfitPPM: res.avgProfitPPM,
+		AvgProfitPPM: &res.avgProfitPPM,
 		CreatedBy:    cfg.UserID,
 	}
 
