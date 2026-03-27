@@ -95,7 +95,12 @@ func mapRunMeta(r run.Run) *analysispb.RunMeta {
 		Market:       mapMarketSpec(r.Market),
 		Interval:     r.Interval.String(),
 		SignalsCount: r.SignalsCount,
-		AvgProfitPpm: *r.AvgProfitPPM,
+		AvgProfitPpm: func() int64 {
+			if r.AvgProfitPPM == nil {
+				return 0
+			}
+			return *r.AvgProfitPPM
+		}(),
 	}
 	if !r.From.IsZero() {
 		meta.From = timestamppb.New(r.From)
