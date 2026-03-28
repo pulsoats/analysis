@@ -102,8 +102,9 @@ func mapRunMeta(r run.Run) *analysispb.RunMeta {
 			Code:    mapRunStatusCode(r.Status.Code),
 			Message: r.Status.Message,
 		},
-		Market:   mapMarketSpec(r.Market),
-		Interval: r.Interval.String(),
+		Market:    mapMarketSpec(r.Market),
+		Interval:  r.Interval.String(),
+		PriceType: string(r.PriceType),
 		Detector: mapDetectorsResponse(r.Detector),
 		SignalsCount: func() int64 {
 			if r.SignalsCount == nil {
@@ -118,6 +119,7 @@ func mapRunMeta(r run.Run) *analysispb.RunMeta {
 			return *r.AvgProfitPPM
 		}(),
 		CreatedBy: r.CreatedBy,
+		CreatedAt: timestamppb.New(r.CreatedAt),
 	}
 	if r.From != nil {
 		meta.From = timestamppb.New(*r.From)

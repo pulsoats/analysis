@@ -119,6 +119,7 @@ func (r *repo) RunByID(ctx context.Context, runID int64) (run.Run, error) {
 			category,
 			symbol,
 			interval,
+			price_type,
 			detector_code,
 			detector_label,
 			detector_opts,
@@ -144,6 +145,7 @@ func (r *repo) RunByID(ctx context.Context, runID int64) (run.Run, error) {
 		&res.Market.Category,
 		&res.Market.Symbol,
 		&interval,
+		&res.PriceType,
 		&res.Detector.Code,
 		&res.Detector.Label,
 		&res.Detector.Opts,
@@ -175,7 +177,7 @@ func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *int64, ca
 	const (
 		queryMine = `
 			SELECT
-				id, exchange, category, symbol, interval,
+				id, exchange, category, symbol, interval, price_type,
 				detector_code, detector_label, detector_opts,
 				from_time, to_time, signals_count, avg_profit_ppm,
 				created_by, created_at, status_code, status_message,
@@ -188,7 +190,7 @@ func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *int64, ca
 			LIMIT $2;`
 		queryShared = `
 			SELECT
-				id, exchange, category, symbol, interval,
+				id, exchange, category, symbol, interval, price_type,
 				detector_code, detector_label, detector_opts,
 				from_time, to_time, signals_count, avg_profit_ppm,
 				created_by, created_at, status_code, status_message,
@@ -201,7 +203,7 @@ func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *int64, ca
 			LIMIT $2;`
 		queryAll = `
 			SELECT
-				id, exchange, category, symbol, interval,
+				id, exchange, category, symbol, interval, price_type,
 				detector_code, detector_label, detector_opts,
 				from_time, to_time, signals_count, avg_profit_ppm,
 				created_by, created_at, status_code, status_message,
@@ -238,6 +240,7 @@ func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *int64, ca
 			&newRun.Market.Category,
 			&newRun.Market.Symbol,
 			&rawInterval,
+			&newRun.PriceType,
 			&newRun.Detector.Code,
 			&newRun.Detector.Label,
 			&newRun.Detector.Opts,
