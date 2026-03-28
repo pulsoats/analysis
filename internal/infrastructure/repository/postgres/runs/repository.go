@@ -26,9 +26,9 @@ func (r *repo) CreateRun(ctx context.Context, runModel *run.Run, status run.Stat
 				exchange, category, symbol, interval,
 			detector_code, detector_label, detector_opts,
 			from_time, to_time, status_code, status_message,
-			created_by
+			created_by, price_type
 			)
-			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 			RETURNING id, created_at;
 	`
 	err := r.pool.QueryRow(ctx, query,
@@ -44,6 +44,7 @@ func (r *repo) CreateRun(ctx context.Context, runModel *run.Run, status run.Stat
 		status.Code,
 		status.Message,
 		runModel.CreatedBy,
+		runModel.PriceType,
 	).Scan(&runModel.ID, &runModel.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("create run: %w", errors.Join(errorsx.ErrInternal, err))
