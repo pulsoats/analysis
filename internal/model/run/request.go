@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pulsoats/core/domain/derrors"
 	"github.com/pulsoats/core/domain/detect"
 	"github.com/pulsoats/core/domain/market"
+	"github.com/pulsoats/core/errorsx"
 )
 
 type Request struct {
@@ -23,25 +23,25 @@ type Request struct {
 func (cfg *Request) Validate() error {
 	var zero market.Spec
 	if cfg.Market == zero {
-		return fmt.Errorf("%w: market spec", derrors.ErrRequired)
+		return fmt.Errorf("market spec: %w", errorsx.ErrRequired)
 	}
 	if cfg.Market.Exchange == "" || cfg.Market.Category == "" {
-		return fmt.Errorf("%w: market exchange or/and category", derrors.ErrRequired)
+		return fmt.Errorf("market exchange or/and category: %w", errorsx.ErrRequired)
 	}
 	if cfg.Market.Symbol == "" {
-		return fmt.Errorf("%w: market symbol", derrors.ErrRequired)
+		return fmt.Errorf("market symbol: %w", errorsx.ErrRequired)
 	}
 
 	if cfg.From.IsZero() || cfg.To.IsZero() {
-		return fmt.Errorf("%w: time range", derrors.ErrRequired)
+		return fmt.Errorf("time range: %w", errorsx.ErrRequired)
 	}
 
 	if cfg.Detector.Code == "" {
-		return fmt.Errorf("%w: detector code", derrors.ErrRequired)
+		return fmt.Errorf("detector code: %w", errorsx.ErrRequired)
 	}
 
 	if cfg.UserID == "" {
-		return fmt.Errorf("%w: user_id", derrors.ErrRequired)
+		return fmt.Errorf("user_id: %w", errorsx.ErrRequired)
 	}
 
 	return nil

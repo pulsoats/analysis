@@ -11,6 +11,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 )
 
@@ -54,45 +55,6 @@ func (s *AnalysisServer) StartRun(ctx context.Context, req *analysispb.StartRunR
 	}
 
 	return &analysispb.StartRunResponse{RunId: strconv.FormatInt(runID, 10)}, nil
-}
-
-func (s *AnalysisServer) GetRunStatus(ctx context.Context, req *analysispb.GetRunRequest) (*analysispb.GetRunStatusResponse, error) {
-	logger := grpcLogger("GetRunStatus")
-	if req == nil {
-		logger.Warn().Msg("nil request received")
-		return nil, status.Error(codes.InvalidArgument, "nil request")
-	}
-
-	runIDStr := req.GetRunId()
-	runID, err := parseRunID(runIDStr)
-	if err != nil {
-		logger.Warn().
-			Str("run_id", runIDStr).
-			Err(err).
-			Msg("invalid run_id received")
-		return nil, status.Error(codes.InvalidArgument, "invalid run_id")
-	}
-	logger = logger.With().Int64("run_id", runID).Logger()
-
-	runStatus, err := s.runUC.Status(ctx, runID)
-	if err != nil {
-		st := errorx.ToStatus(err)
-		if st.Code() == codes.NotFound {
-			logger.Warn().Err(err).Msg("run not found")
-		} else {
-			logger.Error().Err(err).Msg("failed to fetch run status")
-		}
-		return nil, st.Err()
-	}
-
-	logger.Debug().
-		Int("status", runStatus.Code).
-		Msg("returning run status")
-
-	return &analysispb.GetRunStatusResponse{
-		Status:  mapRunStatusCode(runStatus.Code),
-		Message: runStatus.Message,
-	}, nil
 }
 
 func (s *AnalysisServer) GetRunMeta(ctx context.Context, req *analysispb.GetRunRequest) (*analysispb.RunMeta, error) {
@@ -211,7 +173,14 @@ func (s *AnalysisServer) ListRunsPaged(ctx context.Context, req *analysispb.List
 		logger = logger.With().Int64("before_id", beforeIDRaw).Logger()
 	}
 
-	runs, hasMore, nextBeforeID, err := s.runUC.ListRunsPaged(ctx, int(limit), beforeID)
+	callerID, err := callerIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	filter := mapRunFilter(req.GetFilter())
+
+	runs, hasMore, nextBeforeID, err := s.runUC.ListRunsPaged(ctx, int(limit), beforeID, callerID, filter)
 	if err != nil {
 		st := errorx.ToStatus(err)
 		if st.Code() == codes.NotFound {
@@ -241,6 +210,37 @@ func (s *AnalysisServer) ListRunsPaged(ctx context.Context, req *analysispb.List
 	return resp, nil
 }
 
+func (s *AnalysisServer) ShareRun(ctx context.Context, req *analysispb.ShareRunRequest) (*analysispb.ShareRunResponse, error) {
+	logger := grpcLogger("ShareRun")
+	if req == nil {
+		logger.Warn().Msg("nil request received")
+		return nil, status.Error(codes.InvalidArgument, "nil request")
+	}
+
+	runID, err := parseRunID(req.GetRunId())
+	if err != nil {
+		logger.Warn().Str("run_id", req.GetRunId()).Err(err).Msg("invalid run_id")
+		return nil, status.Error(codes.InvalidArgument, "invalid run_id")
+	}
+
+	callerID, err := callerIDFromCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := s.runUC.ShareRun(ctx, runID, callerID); err != nil {
+		st := errorx.ToStatus(err)
+		if st.Code() == codes.NotFound {
+			logger.Warn().Int64("run_id", runID).Err(err).Msg("run not found or not owned by caller")
+			return nil, status.Error(codes.NotFound, "run not found or not yours")
+		}
+		logger.Error().Int64("run_id", runID).Err(err).Msg("failed to share run")
+		return nil, st.Err()
+	}
+
+	return &analysispb.ShareRunResponse{Success: true}, nil
+}
+
 func parseRunID(runID string) (int64, error) {
 	if runID == "" {
 		return 0, fmt.Errorf("run_id is empty")
@@ -250,4 +250,16 @@ func parseRunID(runID string) (int64, error) {
 		return 0, fmt.Errorf("run_id must be a numeric string: %w", err)
 	}
 	return parsed, nil
+}
+
+func callerIDFromCtx(ctx context.Context) (string, error) {
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return "", status.Error(codes.Unauthenticated, "missing metadata")
+	}
+	vals := md.Get("user-id")
+	if len(vals) == 0 || vals[0] == "" {
+		return "", status.Error(codes.Unauthenticated, "missing user-id in metadata")
+	}
+	return vals[0], nil
 }

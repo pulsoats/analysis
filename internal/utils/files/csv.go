@@ -2,6 +2,7 @@ package files
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"slices"
@@ -9,10 +10,9 @@ import (
 	"time"
 
 	"github.com/pulsoats/analysis/internal/model"
-	"github.com/pulsoats/core/domain/derrors"
 	"github.com/pulsoats/core/domain/market"
 	corecsv "github.com/pulsoats/core/lib/csv"
-	"github.com/pulsoats/core/lib/errorsx"
+	"github.com/pulsoats/core/errorsx"
 	"github.com/pulsoats/core/lib/format"
 	"github.com/pulsoats/core/lib/units"
 )
@@ -39,12 +39,12 @@ func BuildSignalsCSV(ctx context.Context, w io.Writer, runID string, signals []m
 		}),
 	)
 	if err != nil {
-		return fmt.Errorf("build signals csv: new writer: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("build signals csv: new writer: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
 	if _, err := sw.WriteAll(ctx, signals); err != nil {
 		_ = sw.Close()
-		return fmt.Errorf("build signals csv: write: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("build signals csv: write: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
 	return sw.Close()
@@ -52,7 +52,7 @@ func BuildSignalsCSV(ctx context.Context, w io.Writer, runID string, signals []m
 
 func BuildCandlesCSV(ctx context.Context, w io.Writer, candles []market.Candle) error {
 	if len(candles) == 0 {
-		return fmt.Errorf("build candles csv: %w: no candles to export", derrors.ErrInvalidArgument)
+		return fmt.Errorf("build candles csv: no candles to export: %w", errorsx.ErrInvalidArgument)
 	}
 
 	cw, err := corecsv.NewWriter[market.Candle](
@@ -63,12 +63,12 @@ func BuildCandlesCSV(ctx context.Context, w io.Writer, candles []market.Candle) 
 		}),
 	)
 	if err != nil {
-		return fmt.Errorf("build candles csv: new writer: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("build candles csv: new writer: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
 	if _, err := cw.WriteAll(ctx, candles); err != nil {
 		_ = cw.Close()
-		return fmt.Errorf("build candles csv: write: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("build candles csv: write: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
 	return cw.Close()
@@ -85,19 +85,19 @@ func encodeAnalysisSignal(runID string, sig model.AnalysisSignal) []string {
 		sig.Status,
 		sig.Detector,
 		timeStr,
-		format.FormatCents(sig.Value),
-		format.FormatCents(sig.BuyValue),
+		format.CentsToString(sig.Value),
+		format.CentsToString(sig.BuyValue),
 		time.UnixMilli(sig.BuyTime).UTC().Format(time.RFC3339),
-		format.FormatCents(sig.TakeProfitValue),
-		format.FormatCents(sig.StopLossValue),
+		format.CentsToString(sig.TakeProfitValue),
+		format.CentsToString(sig.StopLossValue),
 		time.UnixMilli(sig.SellTime).UTC().Format(time.RFC3339),
 		strconv.FormatFloat(profitability, 'f', 4, 64) + "%",
 		time.UnixMilli(sig.Extremes[0].Time).UTC().Format(time.RFC3339),
-		format.FormatCents(sig.Extremes[0].Close),
+		format.CentsToString(sig.Extremes[0].Close),
 		time.UnixMilli(sig.Extremes[1].Time).UTC().Format(time.RFC3339),
-		format.FormatCents(sig.Extremes[1].Close),
+		format.CentsToString(sig.Extremes[1].Close),
 		time.UnixMilli(sig.Extremes[2].Time).UTC().Format(time.RFC3339),
-		format.FormatCents(sig.Extremes[2].Close),
+		format.CentsToString(sig.Extremes[2].Close),
 	}
 }
 
@@ -106,10 +106,10 @@ func encodeCandle(candle market.Candle) []string {
 
 	return []string{
 		candleTime,
-		format.FormatCents(candle.Open),
-		format.FormatCents(candle.High),
-		format.FormatCents(candle.Low),
-		format.FormatCents(candle.Close),
+		format.CentsToString(candle.Open),
+		format.CentsToString(candle.High),
+		format.CentsToString(candle.Low),
+		format.CentsToString(candle.Close),
 		fmt.Sprintf("%2.f", float64(candle.Volume)/float64(units.PPM)),
 		fmt.Sprintf("%2.f", candle.Turnover),
 		string(candle.PriceType),

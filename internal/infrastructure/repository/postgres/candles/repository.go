@@ -2,15 +2,15 @@ package candles
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pulsoats/analysis/internal/model"
-	"github.com/pulsoats/core/domain/derrors"
 	"github.com/pulsoats/core/domain/market"
-	"github.com/pulsoats/core/lib/errorsx"
+	"github.com/pulsoats/core/errorsx"
 )
 
 type repo struct {
@@ -28,14 +28,14 @@ func (r *repo) Upsert(ctx context.Context, spec market.CandleSpec, candles []mar
 
 	tx, err := r.pool.BeginTx(ctx, pgx.TxOptions{})
 	if err != nil {
-		return fmt.Errorf("upsert: begin tx: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("upsert: begin tx: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	defer func() {
 		_ = tx.Rollback(ctx)
 	}()
 
 	if _, err := tx.Exec(ctx, `TRUNCATE analysis.candles_staging`); err != nil {
-		return fmt.Errorf("upsert: truncate staging: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("upsert: truncate staging: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
 	rows := make([][]any, 0, len(candles))
@@ -70,7 +70,7 @@ func (r *repo) Upsert(ctx context.Context, spec market.CandleSpec, candles []mar
 		pgx.CopyFromRows(rows),
 	)
 	if err != nil {
-		return fmt.Errorf("upsert: copy into staging: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("upsert: copy into staging: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
 	const mergeSQL = `
@@ -88,11 +88,11 @@ ON CONFLICT (exchange, category, symbol, interval, time, price_type)
 DO NOTHING;
 `
 	if _, err := tx.Exec(ctx, mergeSQL); err != nil {
-		return fmt.Errorf("upsert: merge into candles: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("upsert: merge into candles: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
 	if err := tx.Commit(ctx); err != nil {
-		return fmt.Errorf("upsert: commit: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("upsert: commit: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	return nil
 }
@@ -101,22 +101,22 @@ func (r *repo) ListByTime(ctx context.Context, spec market.CandleSpec, from, to 
 	const query = `
 		SELECT time, open_price, high_price, low_price, close_price, volume, turnover, price_type
 		FROM analysis.candles
-		WHERE exchange = $1 
-		  AND category = $2 
-		  AND symbol = $3 
-		  AND interval = $4 
+		WHERE exchange = $1
+		  AND category = $2
+		  AND symbol = $3
+		  AND interval = $4
 		  AND time >= $5 AND time < $6
 		  AND price_type = $7
 		ORDER BY time;
 	`
 
 	if from.After(to) {
-		return nil, fmt.Errorf("list by time: %w: from > to", derrors.ErrInvalidArgument)
+		return nil, fmt.Errorf("list by time: from > to: %w", errorsx.ErrInvalidArgument)
 	}
 
 	rows, err := r.pool.Query(ctx, query, spec.Exchange, spec.Category, spec.Symbol, intervalSec(spec.Interval), from, to, priceType)
 	if err != nil {
-		return nil, fmt.Errorf("list by time: %w: %v", errorsx.ErrInternal, err)
+		return nil, fmt.Errorf("list by time: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	defer rows.Close()
 
@@ -124,13 +124,13 @@ func (r *repo) ListByTime(ctx context.Context, spec market.CandleSpec, from, to 
 		var c market.Candle
 		var ts time.Time
 		if err := row.Scan(&ts, &c.Open, &c.High, &c.Low, &c.Close, &c.Volume, &c.Turnover, &c.PriceType); err != nil {
-			return market.Candle{}, fmt.Errorf("list by time: %w: %v", errorsx.ErrInternal, err)
+			return market.Candle{}, fmt.Errorf("list by time: scan: %w", errors.Join(errorsx.ErrInternal, err))
 		}
 		c.Time = ts.UTC().UnixMilli()
 		return c, nil
 	})
 	if err != nil {
-		return nil, fmt.Errorf("list by time: %w: %v", errorsx.ErrInternal, err)
+		return nil, fmt.Errorf("list by time: collect: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
 	return candles, nil

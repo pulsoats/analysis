@@ -18,6 +18,15 @@ const (
 	StatusFailed
 )
 
+type RunFilter int
+
+const (
+	RunFilterUnspecified RunFilter = iota
+	RunFilterMine
+	RunFilterShared
+	RunFilterAll
+)
+
 type Status struct {
 	Code    int
 	Message string
@@ -26,16 +35,19 @@ type Status struct {
 // Run описывает агрегированный результат прогонов исторического сервиса.
 type Run struct {
 	ID           int64
+	Status       Status
 	Market       market.Spec
 	Interval     market.Interval
+	PriceType    market.PriceType
 	Detector     detect.DetectorConfig
-	From         time.Time
-	To           time.Time
-	SignalsCount int64
+	From         *time.Time
+	To           *time.Time
+	SignalsCount *int64
 	AvgProfitPPM *int64
 	CreatedBy    string
 	CreatedAt    time.Time
-	Status       Status
+	IsShared     bool
+	SharedAt     *time.Time
 }
 
 func (r Run) String() string {
@@ -52,7 +64,8 @@ type Repository interface {
 	UpdateResult(ctx context.Context, res Run) error
 	StatusByRunID(ctx context.Context, runID int64) (Status, error)
 	RunByID(ctx context.Context, runID int64) (Run, error)
-	ListRunsPaged(ctx context.Context, limit int, beforeID *int64) ([]Run, bool, *int64, error)
+	ListRunsPaged(ctx context.Context, limit int, beforeID *int64, callerID string, filter RunFilter) ([]Run, bool, *int64, error)
+	ShareRun(ctx context.Context, runID int64, callerID string) error
 }
 
 type Service interface {
@@ -60,5 +73,6 @@ type Service interface {
 	Status(ctx context.Context, runID int64) (Status, error)
 	StreamRunResult(ctx context.Context, runID int64, w io.Writer) error
 	FindByID(ctx context.Context, runID int64) (Run, error)
-	ListRunsPaged(ctx context.Context, limit int, beforeID *int64) ([]Run, bool, *int64, error)
+	ListRunsPaged(ctx context.Context, limit int, beforeID *int64, callerID string, filter RunFilter) ([]Run, bool, *int64, error)
+	ShareRun(ctx context.Context, runID int64, callerID string) error
 }

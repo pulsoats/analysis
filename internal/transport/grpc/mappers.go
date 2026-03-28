@@ -8,9 +8,9 @@ import (
 	"github.com/pulsoats/analysis/internal/model/run"
 	analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
 	commonpb "github.com/pulsoats/contracts/gen/go/common/v1"
-	"github.com/pulsoats/core/domain/derrors"
 	"github.com/pulsoats/core/domain/detect"
 	"github.com/pulsoats/core/domain/market"
+	"github.com/pulsoats/core/errorsx"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -24,7 +24,7 @@ func mapStartRunRequest(req *analysispb.StartRunRequest) (run.Request, error) {
 
 	interval, ok := market.ParseInterval(req.Interval)
 	if !ok {
-		return run.Request{}, fmt.Errorf("%w: interval %v", derrors.ErrInvalidArgument, req.Interval)
+		return run.Request{}, fmt.Errorf("interval %v: %w", req.Interval, errorsx.ErrInvalidArgument)
 	}
 
 	category := market.Category(req.Market.Category)
@@ -52,7 +52,7 @@ func mapStartRunRequest(req *analysispb.StartRunRequest) (run.Request, error) {
 
 func mapDetectorsRequest(rawDetector *commonpb.DetectorConfig) (detect.DetectorConfig, error) {
 	if rawDetector.Code == "" {
-		return detect.DetectorConfig{}, fmt.Errorf("%w: detector code", derrors.ErrRequired)
+		return detect.DetectorConfig{}, fmt.Errorf("detector code: %w", errorsx.ErrRequired)
 	}
 
 	return detect.DetectorConfig{
@@ -72,43 +72,68 @@ func mapFeesRequest(f *commonpb.Fees) *market.TakerMakerFees {
 	}
 }
 
-func mapRunStatusCode(code int) analysispb.RunStatus {
+func mapRunStatusCode(code int) analysispb.RunStatusCode {
 	switch code {
 	case run.StatusPending:
-		return analysispb.RunStatus_RUN_STATUS_PENDING
+		return analysispb.RunStatusCode_RUN_STATUS_PENDING
 	case run.StatusRunning:
-		return analysispb.RunStatus_RUN_STATUS_RUNNING
+		return analysispb.RunStatusCode_RUN_STATUS_RUNNING
 	case run.StatusDone:
-		return analysispb.RunStatus_RUN_STATUS_DONE
+		return analysispb.RunStatusCode_RUN_STATUS_DONE
 	case run.StatusFailed:
-		return analysispb.RunStatus_RUN_STATUS_FAILED
+		return analysispb.RunStatusCode_RUN_STATUS_FAILED
 	default:
-		return analysispb.RunStatus_RUN_STATUS_UNSPECIFIED
+		return analysispb.RunStatusCode_RUN_STATUS_UNSPECIFIED
 	}
 }
 
 func mapRunMeta(r run.Run) *analysispb.RunMeta {
 	meta := &analysispb.RunMeta{
-		Id:           strconv.FormatInt(r.ID, 10),
-		Status:       mapRunStatusCode(r.Status.Code),
-		UserId:       r.CreatedBy,
-		Market:       mapMarketSpec(r.Market),
-		Interval:     r.Interval.String(),
-		SignalsCount: r.SignalsCount,
+		Id: strconv.FormatInt(r.ID, 10),
+		Status: &analysispb.Status{
+			Code:    mapRunStatusCode(r.Status.Code),
+			Message: r.Status.Message,
+		},
+		Market:   mapMarketSpec(r.Market),
+		Interval: r.Interval.String(),
+		SignalsCount: func() int64 {
+			if r.SignalsCount == nil {
+				return 0
+			}
+			return *r.SignalsCount
+		}(),
 		AvgProfitPpm: func() int64 {
 			if r.AvgProfitPPM == nil {
 				return 0
 			}
 			return *r.AvgProfitPPM
 		}(),
+		CreatedBy: r.CreatedBy,
 	}
-	if !r.From.IsZero() {
-		meta.From = timestamppb.New(r.From)
+	if r.From != nil {
+		meta.From = timestamppb.New(*r.From)
 	}
-	if !r.To.IsZero() {
-		meta.To = timestamppb.New(r.To)
+	if r.To != nil {
+		meta.To = timestamppb.New(*r.To)
+	}
+	meta.IsShared = r.IsShared
+	if r.SharedAt != nil {
+		meta.SharedAt = timestamppb.New(*r.SharedAt)
 	}
 	return meta
+}
+
+func mapRunFilter(f analysispb.RunFilter) run.RunFilter {
+	switch f {
+	case analysispb.RunFilter_RUN_FILTER_MINE:
+		return run.RunFilterMine
+	case analysispb.RunFilter_RUN_FILTER_SHARED:
+		return run.RunFilterShared
+	case analysispb.RunFilter_RUN_FILTER_ALL:
+		return run.RunFilterAll
+	default:
+		return run.RunFilterUnspecified
+	}
 }
 
 func mapMarketSpec(spec market.Spec) *commonpb.MarketSpec {

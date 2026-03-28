@@ -2,17 +2,17 @@ package run
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
 
 	"github.com/pulsoats/analysis/internal/model/run"
 	"github.com/pulsoats/analysis/internal/utils/files"
-	"github.com/pulsoats/core/domain/derrors"
 	"github.com/pulsoats/core/domain/detect"
 	"github.com/pulsoats/core/domain/detect/detectors"
 	"github.com/pulsoats/core/domain/market"
-	"github.com/pulsoats/core/lib/errorsx"
+	"github.com/pulsoats/core/errorsx"
 	"golang.org/x/sync/singleflight"
 
 	dets "github.com/pulsoats/analysis/internal/detect"
@@ -56,15 +56,16 @@ func (s *service) StartRun(ctx context.Context, req run.Request) (int64, error) 
 	}
 
 	if _, ok := s.exchanges[req.Market.Exchange]; !ok {
-		return 0, fmt.Errorf("start run: %w: exchange %s", derrors.ErrNotFound, req.Market.Exchange)
+		return 0, fmt.Errorf("start run: exchange %s: %w", req.Market.Exchange, errorsx.ErrNotFound)
 	}
 
+	from, to := req.From.UTC(), req.To.UTC()
 	record := run.Run{
 		Market:    req.Market,
 		Interval:  req.Interval,
 		Detector:  req.Detector,
-		From:      req.From.UTC(),
-		To:        req.To.UTC(),
+		From:      &from,
+		To:        &to,
 		CreatedBy: req.UserID,
 	}
 
@@ -106,20 +107,20 @@ func (s *service) StreamRunResult(ctx context.Context, runID int64, w io.Writer)
 		return fmt.Errorf("stream run result: %w", err)
 	}
 	if st.Code != run.StatusDone {
-		return fmt.Errorf("stream run result: %w: run %d result not ready", derrors.ErrInvalidArgument, runID)
+		return fmt.Errorf("stream run result: run %d result not ready: %w", runID, errorsx.ErrInvalidArgument)
 	}
 
 	zipPath := s.runZipPath(runID)
 
 	f, err := os.Open(zipPath)
 	if err != nil {
-		return fmt.Errorf("stream run result: open archive: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("stream run result: open archive: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	defer f.Close()
 
 	buf := make([]byte, 64*1024)
 	if _, err = io.CopyBuffer(w, f, buf); err != nil {
-		return fmt.Errorf("stream run result: copy archive: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("stream run result: copy archive: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	return nil
 }
@@ -132,41 +133,53 @@ func (s *service) FindByID(ctx context.Context, runID int64) (run.Run, error) {
 	return r, nil
 }
 
-func (s *service) ListRunsPaged(ctx context.Context, limit int, beforeID *int64) ([]run.Run, bool, *int64, error) {
-	return s.repo.ListRunsPaged(ctx, limit, beforeID)
+func (s *service) ListRunsPaged(ctx context.Context, limit int, beforeID *int64, callerID string, filter run.RunFilter) ([]run.Run, bool, *int64, error) {
+	return s.repo.ListRunsPaged(ctx, limit, beforeID, callerID, filter)
+}
+
+func (s *service) ShareRun(ctx context.Context, runID int64, callerID string) error {
+	if err := s.repo.ShareRun(ctx, runID, callerID); err != nil {
+		return fmt.Errorf("share run: %w", err)
+	}
+	return nil
 }
 
 func (s *service) executeRun(ctx context.Context, runID int64, cfg run.Request) error {
-	if cfg.Fees == nil {
-		return fmt.Errorf("execute run: %w: fees config", derrors.ErrRequired)
-	}
-
 	optsAny, err := s.detRegistry.UnmarshalOpts(cfg.Detector.Code, cfg.Detector.Opts)
 	if err != nil {
-		return fmt.Errorf("execute run: decode detector opts: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("execute run: decode detector opts: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
 	detector, err := s.detRegistry.NewCandle(cfg.Detector.Code, cfg.Detector.Label, optsAny)
 	if err != nil {
-		return fmt.Errorf("execute run: build detector: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("execute run: build detector: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	det, ok := detector.(detect.CandleDetector)
 	if !ok {
-		return fmt.Errorf("execute run: %w: wrong detector type", errorsx.ErrInternal)
+		return fmt.Errorf("execute run: wrong detector type: %w", errorsx.ErrInternal)
 	}
 
 	exApi, ok := s.exchanges[cfg.Market.Exchange]
 	if !ok {
-		return fmt.Errorf("execute run: %w: exchange %s", derrors.ErrNotFound, cfg.Market.Exchange)
+		return fmt.Errorf("execute run: exchange %s: %w", cfg.Market.Exchange, errorsx.ErrNotFound)
+	}
+
+	fees := cfg.Fees
+	if fees == nil {
+		defaultFees, err := exApi.DefaultFees(cfg.Market.Category)
+		if err != nil {
+			return fmt.Errorf("execute run: get default fees: %w", err)
+		}
+		fees = &defaultFees
 	}
 
 	candles, err := s.fetchCandles(ctx, market.CandleSpec{Spec: cfg.Market, Interval: cfg.Interval}, cfg.From, cfg.To, cfg.PriceType)
 	if err != nil {
 		return fmt.Errorf("execute run: fetch candles: %w", err)
 	}
-	signals, err := s.detectSvc.Run(ctx, candles, *cfg.Fees, det)
+	signals, err := s.detectSvc.Run(ctx, candles, *fees, det)
 	if err != nil {
-		return fmt.Errorf("execute run: detect signals: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("execute run: detect signals: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
 	res, err := s.processResult(ctx, processRunRequest{
@@ -177,20 +190,21 @@ func (s *service) executeRun(ctx context.Context, runID int64, cfg run.Request) 
 		market:    cfg.Market,
 		interval:  cfg.Interval,
 		priceType: cfg.PriceType,
-		fees:      *cfg.Fees,
+		fees:      *fees,
 	})
 	if err != nil {
 		return fmt.Errorf("execute run: process result: %w", err)
 	}
 	fromBound, toBound := timeBounds(candles)
+	signalsCount := int64(len(res.signals))
 	analysisRun := run.Run{
 		ID:           runID,
 		Market:       cfg.Market,
 		Interval:     cfg.Interval,
 		Detector:     cfg.Detector,
-		From:         fromBound,
-		To:           toBound,
-		SignalsCount: int64(len(res.signals)),
+		From:         &fromBound,
+		To:           &toBound,
+		SignalsCount: &signalsCount,
 		AvgProfitPPM: &res.avgProfitPPM,
 		CreatedBy:    cfg.UserID,
 	}
@@ -201,7 +215,7 @@ func (s *service) executeRun(ctx context.Context, runID int64, cfg run.Request) 
 
 	zipPath := s.runZipPath(runID)
 	if err := files.BuildZipResult(ctx, zipPath, analysisRun, candles, res.signals); err != nil {
-		return fmt.Errorf("execute run: build archive: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("execute run: build archive: %w", err)
 	}
 	return nil
 }

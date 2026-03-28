@@ -2,19 +2,19 @@ package run
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"time"
 
-	"github.com/pulsoats/core/domain/derrors"
 	"github.com/pulsoats/core/domain/exchange"
 	"github.com/pulsoats/core/domain/market"
-	"github.com/pulsoats/core/lib/errorsx"
+	"github.com/pulsoats/core/errorsx"
 )
 
 func (s *service) fetchCandles(ctx context.Context, spec market.CandleSpec, from, to time.Time, priceType market.PriceType) ([]market.Candle, error) {
 	if !from.Before(to) {
-		return nil, fmt.Errorf("fetch candles: %w: from %s >= to %s", derrors.ErrInvalidArgument, from, to)
+		return nil, fmt.Errorf("fetch candles: from %s >= to %s: %w", from, to, errorsx.ErrInvalidArgument)
 	}
 
 	reqFrom := from.UTC().UnixMilli()
@@ -24,7 +24,7 @@ func (s *service) fetchCandles(ctx context.Context, spec market.CandleSpec, from
 	v, err, _ := s.candlesSF.Do(sfKey, func() (any, error) {
 		api, ok := s.exchanges[spec.Exchange]
 		if !ok {
-			return nil, fmt.Errorf("fetch candles: %w: exchange %s", derrors.ErrNotFound, spec.Exchange)
+			return nil, fmt.Errorf("fetch candles: exchange %s: %w", spec.Exchange, errorsx.ErrNotFound)
 		}
 		return s.loadCandlesRange(ctx, api, spec, from, to, priceType)
 	})
@@ -56,7 +56,7 @@ func (s *service) loadCandlesRange(
 	if len(dbCandles) == 0 {
 		exCandles, err := api.Candles(ctx, spec, from, to, priceType)
 		if err != nil {
-			return nil, fmt.Errorf("load candles range: fetch exchange candles: %w: %v", errorsx.ErrInternal, err)
+			return nil, fmt.Errorf("load candles range: fetch exchange candles: %w", errors.Join(errorsx.ErrInternal, err))
 		}
 		if err := s.candleRepo.Upsert(ctx, spec, exCandles); err != nil {
 			return nil, fmt.Errorf("load candles range: upsert candles: %w", err)
@@ -77,7 +77,7 @@ func (s *service) loadCandlesRange(
 		leftFrom := from
 		exLeft, err := api.Candles(ctx, spec, leftFrom, leftTo, priceType)
 		if err != nil {
-			return nil, fmt.Errorf("load candles range: fetch left range: %w: %v", errorsx.ErrInternal, err)
+			return nil, fmt.Errorf("load candles range: fetch left range: %w", errors.Join(errorsx.ErrInternal, err))
 		}
 		if err := s.candleRepo.Upsert(ctx, spec, exLeft); err != nil {
 			return nil, fmt.Errorf("load candles range: upsert left range: %w", err)
@@ -90,7 +90,7 @@ func (s *service) loadCandlesRange(
 		rightTo := to
 		exRight, err := api.Candles(ctx, spec, rightFrom, rightTo, priceType)
 		if err != nil {
-			return nil, fmt.Errorf("load candles range: fetch right range: %w: %v", errorsx.ErrInternal, err)
+			return nil, fmt.Errorf("load candles range: fetch right range: %w", errors.Join(errorsx.ErrInternal, err))
 		}
 		if err := s.candleRepo.Upsert(ctx, spec, exRight); err != nil {
 			return nil, fmt.Errorf("load candles range: upsert right range: %w", err)
@@ -106,7 +106,7 @@ func (s *service) loadCandlesRange(
 
 	slice, ok := sliceCandles(merged, reqFrom, reqTo)
 	if !ok {
-		return nil, fmt.Errorf("load candles range: %w: requested range missing", errorsx.ErrInternal)
+		return nil, fmt.Errorf("load candles range: requested range missing: %w", errorsx.ErrInternal)
 	}
 
 	return slice, nil

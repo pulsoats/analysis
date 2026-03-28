@@ -4,14 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/pulsoats/analysis/internal/model/run"
-	"github.com/pulsoats/core/domain/derrors"
 	"github.com/pulsoats/core/domain/market"
-	"github.com/pulsoats/core/lib/errorsx"
+	"github.com/pulsoats/core/errorsx"
 )
 
 type repo struct {
@@ -48,7 +46,7 @@ func (r *repo) CreateRun(ctx context.Context, runModel *run.Run, status run.Stat
 		runModel.CreatedBy,
 	).Scan(&runModel.ID, &runModel.CreatedAt)
 	if err != nil {
-		return fmt.Errorf("create run: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("create run: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	runModel.Status = status
 	return nil
@@ -62,10 +60,10 @@ func (r *repo) UpdateStatus(ctx context.Context, runID int64, status run.Status)
 	`
 	tag, err := r.pool.Exec(ctx, query, runID, status.Code, status.Message)
 	if err != nil {
-		return fmt.Errorf("update run status: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("update run status: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("update run status: %w", derrors.ErrNotFound)
+		return fmt.Errorf("update run status: %w", errorsx.ErrNotFound)
 	}
 	return nil
 }
@@ -81,16 +79,16 @@ func (r *repo) UpdateResult(ctx context.Context, res run.Run) error {
 	`
 	tag, err := r.pool.Exec(ctx, query,
 		res.ID,
-		nullTime(res.From),
-		nullTime(res.To),
+		res.From,
+		res.To,
 		res.SignalsCount,
 		res.AvgProfitPPM,
 	)
 	if err != nil {
-		return fmt.Errorf("update run result: %w: %v", errorsx.ErrInternal, err)
+		return fmt.Errorf("update run result: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("update run result: %w", derrors.ErrNotFound)
+		return fmt.Errorf("update run result: %w", errorsx.ErrNotFound)
 	}
 	return nil
 }
@@ -105,9 +103,9 @@ func (r *repo) StatusByRunID(ctx context.Context, runID int64) (run.Status, erro
 	err := r.pool.QueryRow(ctx, query, runID).Scan(&st.Code, &st.Message)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return run.Status{}, fmt.Errorf("get run status: %w", derrors.ErrNotFound)
+			return run.Status{}, fmt.Errorf("get run status: %w", errorsx.ErrNotFound)
 		}
-		return run.Status{}, fmt.Errorf("get run status: %w: %v", errorsx.ErrInternal, err)
+		return run.Status{}, fmt.Errorf("get run status: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	return st, nil
 }
@@ -130,7 +128,9 @@ func (r *repo) RunByID(ctx context.Context, runID int64) (run.Run, error) {
 			created_by,
 			created_at,
 			status_code,
-			status_message
+			status_message,
+			is_shared,
+			shared_at
 		FROM analysis.runs
 		WHERE id = $1;
 	`
@@ -154,12 +154,14 @@ func (r *repo) RunByID(ctx context.Context, runID int64) (run.Run, error) {
 		&res.CreatedAt,
 		&res.Status.Code,
 		&res.Status.Message,
+		&res.IsShared,
+		&res.SharedAt,
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return run.Run{}, fmt.Errorf("get run: %w", derrors.ErrNotFound)
+			return run.Run{}, fmt.Errorf("get run: %w", errorsx.ErrNotFound)
 		}
-		return run.Run{}, fmt.Errorf("get run: %w: %v", errorsx.ErrInternal, err)
+		return run.Run{}, fmt.Errorf("get run: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	if iv, ok := market.ParseInterval(interval); ok {
 		res.Interval = iv
@@ -167,34 +169,61 @@ func (r *repo) RunByID(ctx context.Context, runID int64) (run.Run, error) {
 	return res, nil
 }
 
-func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *int64) ([]run.Run, bool, *int64, error) {
-	const query = `
-		SELECT
-			id,
-			exchange,
-			category,
-			symbol,
-			interval,
-			detector_code,
-			detector_label,
-			detector_opts,
-			from_time,
-			to_time,
-			signals_count,
-			avg_profit_ppm,
-			created_by,
-			created_at,
-			status_code,
-			status_message
-		FROM analysis.runs
-		WHERE ($1::bigint IS NULL OR id < $1)
-		ORDER BY id DESC
-		LIMIT $2;
-	`
+func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *int64, callerID string, filter run.RunFilter) ([]run.Run, bool, *int64, error) {
+	// $1 = beforeID, $2 = limit+1, $3 = callerID
+	const (
+		queryMine = `
+			SELECT
+				id, exchange, category, symbol, interval,
+				detector_code, detector_label, detector_opts,
+				from_time, to_time, signals_count, avg_profit_ppm,
+				created_by, created_at, status_code, status_message,
+				is_shared, shared_at
+			FROM analysis.runs
+			WHERE created_by = $3
+			  AND status_code IN (3, 4)
+			  AND ($1::bigint IS NULL OR id < $1)
+			ORDER BY id DESC
+			LIMIT $2;`
+		queryShared = `
+			SELECT
+				id, exchange, category, symbol, interval,
+				detector_code, detector_label, detector_opts,
+				from_time, to_time, signals_count, avg_profit_ppm,
+				created_by, created_at, status_code, status_message,
+				is_shared, shared_at
+			FROM analysis.runs
+			WHERE is_shared = true AND created_by != $3
+			  AND status_code IN (3, 4)
+			  AND ($1::bigint IS NULL OR id < $1)
+			ORDER BY id DESC
+			LIMIT $2;`
+		queryAll = `
+			SELECT
+				id, exchange, category, symbol, interval,
+				detector_code, detector_label, detector_opts,
+				from_time, to_time, signals_count, avg_profit_ppm,
+				created_by, created_at, status_code, status_message,
+				is_shared, shared_at
+			FROM analysis.runs
+			WHERE (created_by = $3 OR is_shared = true)
+			  AND status_code IN (3, 4)
+			  AND ($1::bigint IS NULL OR id < $1)
+			ORDER BY id DESC
+			LIMIT $2;`
+	)
 
-	rows, err := r.pool.Query(ctx, query, beforeID, limit+1)
+	query := queryMine
+	switch filter {
+	case run.RunFilterShared:
+		query = queryShared
+	case run.RunFilterAll:
+		query = queryAll
+	}
+
+	rows, err := r.pool.Query(ctx, query, beforeID, limit+1, callerID)
 	if err != nil {
-		return nil, false, nil, fmt.Errorf("list runs paged: %w: %v", errorsx.ErrInternal, err)
+		return nil, false, nil, fmt.Errorf("list runs paged: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	defer rows.Close()
 
@@ -219,6 +248,8 @@ func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *int64) ([
 			&newRun.CreatedAt,
 			&newRun.Status.Code,
 			&newRun.Status.Message,
+			&newRun.IsShared,
+			&newRun.SharedAt,
 		); err != nil {
 			return run.Run{}, err
 		}
@@ -230,7 +261,7 @@ func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *int64) ([
 		return newRun, nil
 	})
 	if err != nil {
-		return nil, false, nil, fmt.Errorf("collect runs paged: %w: %v", errorsx.ErrInternal, err)
+		return nil, false, nil, fmt.Errorf("collect runs paged: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
 	hasMore := len(runs) > limit
@@ -247,9 +278,18 @@ func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *int64) ([
 	return runs, hasMore, nextBeforeID, nil
 }
 
-func nullTime(t time.Time) *time.Time {
-	if t.IsZero() {
-		return nil
+func (r *repo) ShareRun(ctx context.Context, runID int64, callerID string) error {
+	const query = `
+		UPDATE analysis.runs
+		SET is_shared = true, shared_at = NOW()
+		WHERE id = $1 AND created_by = $2;
+	`
+	tag, err := r.pool.Exec(ctx, query, runID, callerID)
+	if err != nil {
+		return fmt.Errorf("share run: %w", errors.Join(errorsx.ErrInternal, err))
 	}
-	return &t
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("share run: %w", errorsx.ErrNotFound)
+	}
+	return nil
 }

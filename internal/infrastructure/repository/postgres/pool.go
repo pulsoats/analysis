@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pulsoats/core/domain/derrors"
+	"github.com/pulsoats/core/errorsx"
 )
 
 func NewPostgresPool(ctx context.Context) (*pgxpool.Pool, error) {
 	dsn := os.Getenv("POSTGRES_DSN")
 	if dsn == "" {
-		return nil, fmt.Errorf("%w: enviroment variable is not set: POSTGRES_DSN", derrors.ErrRequired)
+		return nil, fmt.Errorf("environment variable POSTGRES_DSN is not set: %w", errorsx.ErrRequired)
 	}
 
 	cfg, err := pgxpool.ParseConfig(dsn)

@@ -35,10 +35,10 @@ github.com/mattn/go-isatty v0.0.20/go.mod h1:W+V8PltTTMOvKvAeJH7IuucS94S2C6jfK/D
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
-github.com/pulsoats/contracts v1.1.0 h1:ItGQkI6hCVUPVQ7SWAucuoDuXhXG7iBtqtdJwMRqrlM=
-github.com/pulsoats/contracts v1.1.0/go.mod h1:tALJFOoAijHLIKzqkTYDbVEou0fmUqfUWSsvxGS1XOU=
-github.com/pulsoats/core v1.0.1 h1:KTiEXiHs9fXx22i/W386+HGEGhsXnW6JJNs09sHu8fM=
-github.com/pulsoats/core v1.0.1/go.mod h1:6yUNEmr/1UyDDIKzeTo/80BjTYUdD3YK2OJK8hMGG5g=
+github.com/pulsoats/contracts v1.2.0 h1:7gAkv0l5mfir+ZQXXqJZQ5QEmNbULUiuDeXmNttFJWQ=
+github.com/pulsoats/contracts v1.2.0/go.mod h1:tALJFOoAijHLIKzqkTYDbVEou0fmUqfUWSsvxGS1XOU=
+github.com/pulsoats/core v1.1.1 h1:qRc8/A5SUlVmBkMWZ9WHFEaJE+PTDgt+/l+ggjNjm30=
+github.com/pulsoats/core v1.1.1/go.mod h1:6yUNEmr/1UyDDIKzeTo/80BjTYUdD3YK2OJK8hMGG5g=
 github.com/rs/xid v1.6.0/go.mod h1:7XoLgs4eV+QndskICGsho+ADou8ySMSjJKDIan90Nz0=
 github.com/rs/zerolog v1.34.0 h1:k43nTLIwcTVQAncfCw4KZ2VY6ukYoZaBPNOE8txlOeY=
 github.com/rs/zerolog v1.34.0/go.mod h1:bJsvje4Z08ROH4Nhs5iH600c3IkWhwp44iRc54W6wYQ=
