@@ -62,6 +62,14 @@ func mapDetectorsRequest(rawDetector *commonpb.DetectorConfig) (detect.DetectorC
 	}, nil
 }
 
+func mapDetectorsResponse(det detect.DetectorConfig) *commonpb.DetectorConfig {
+	return &commonpb.DetectorConfig{
+		Code:  det.Code,
+		Label: det.Label,
+		Opts:  det.Opts,
+	}
+}
+
 func mapFeesRequest(f *commonpb.Fees) *market.TakerMakerFees {
 	if f == nil {
 		return nil
@@ -96,6 +104,7 @@ func mapRunMeta(r run.Run) *analysispb.RunMeta {
 		},
 		Market:   mapMarketSpec(r.Market),
 		Interval: r.Interval.String(),
+		Detector: mapDetectorsResponse(r.Detector),
 		SignalsCount: func() int64 {
 			if r.SignalsCount == nil {
 				return 0
