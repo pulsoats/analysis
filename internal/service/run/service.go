@@ -63,6 +63,7 @@ func (s *service) StartRun(ctx context.Context, req run.Request) (int64, error) 
 	record := run.Run{
 		Market:    req.Market,
 		Interval:  req.Interval,
+		PriceType: req.PriceType,
 		Detector:  req.Detector,
 		From:      &from,
 		To:        &to,
