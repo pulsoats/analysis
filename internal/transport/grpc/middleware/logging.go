@@ -2,21 +2,25 @@ package middleware
 
 import (
 	"context"
+	"log/slog"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/status"
 )
 
-// UnaryLogger возвращает interceptor, который логирует запросы.
-func UnaryLogger(logger func(method string, code string, duration time.Duration, err error)) grpc.UnaryServerInterceptor {
-	return func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+// UnaryLogger logs every unary RPC at Info level with method, gRPC status code,
+// and duration. Errors are expected to be logged with full context inside each
+// handler, so the interceptor does not duplicate error logging.
+func UnaryLogger(log *slog.Logger) grpc.UnaryServerInterceptor {
+	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		start := time.Now()
 		resp, err := handler(ctx, req)
-		st := status.Convert(err)
-		if logger != nil {
-			logger(info.FullMethod, st.Code().String(), time.Since(start), err)
-		}
+		log.Info("grpc request",
+			"method", info.FullMethod,
+			"code", status.Code(err).String(),
+			"dur", time.Since(start),
+		)
 		return resp, err
 	}
 }

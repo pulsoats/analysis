@@ -22,7 +22,7 @@ import (
 
 func main() {
 	zl := logger.Configure()
-	logAdapter := logger.AsLogx(zl)
+	slogLogger := logger.NewSlogLogger(zl)
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
@@ -36,7 +36,7 @@ func main() {
 	detectorRegistry := detectors.NewDefaultRegistry()
 	detectService := detect.NewDetectService()
 
-	exReg := exchanges.NewRegistry(exchanges.WithLogger(logAdapter))
+	exReg := exchanges.NewRegistry(exchanges.WithLogger(slogLogger))
 	exchangeAPIs, err := exReg.CreateAllPublic()
 	if err != nil {
 		log.Fatal().Err(err).Msg("load exchange registry")
@@ -57,10 +57,11 @@ func main() {
 		DetectService:    detectService,
 		DetectorRegistry: detectorRegistry,
 		StorageDir:       storageDir,
+		Logger:           slogLogger,
 	}
 
 	runService := run.NewService(cfg)
-	analysisSrv := transportgrpc.NewAnalysisServer(runService)
+	analysisSrv := transportgrpc.NewAnalysisServer(runService, transportgrpc.WithLogger(slogLogger))
 
 	addr := os.Getenv("ANALYSIS_GRPC_ADDR")
 	if addr == "" {
@@ -68,7 +69,7 @@ func main() {
 	}
 
 	log.Info().Str("addr", addr).Msg("starting gRPC server")
-	if err := transportgrpc.RunGRPCServer(ctx, addr, analysisSrv); err != nil {
+	if err := transportgrpc.RunGRPCServer(ctx, addr, analysisSrv, slogLogger); err != nil {
 		log.Fatal().Err(err).Msg("gRPC server stopped with error")
 	}
 

@@ -3,33 +3,29 @@ package grpc
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net"
-	"time"
 
 	"github.com/pulsoats/analysis/internal/transport/grpc/middleware"
+	"github.com/pulsoats/core/lib/logx"
 	analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
-	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
-func RunGRPCServer(ctx context.Context, addr string, analysisSrv analysispb.AnalysisServer) error {
+func RunGRPCServer(ctx context.Context, addr string, analysisSrv analysispb.AnalysisServer, log *slog.Logger) error {
+	if log == nil {
+		log = logx.Discard()
+	}
+	log = log.With("component", "grpc.server")
+
 	lis, err := net.Listen("tcp", addr)
 	if err != nil {
 		return err
 	}
 
 	server := grpc.NewServer(
-		grpc.UnaryInterceptor(middleware.UnaryLogger(func(method, code string, duration time.Duration, err error) {
-			ev := log.Info()
-			if err != nil {
-				ev = log.Error().Err(err)
-			}
-			ev.Str("grpc_method", method).
-				Str("grpc_code", code).
-				Dur("duration", duration).
-				Msg("grpc request")
-		})),
+		grpc.UnaryInterceptor(middleware.UnaryLogger(log)),
 	)
 	reflection.Register(server)
 

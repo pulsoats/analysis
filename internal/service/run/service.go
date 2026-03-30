@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"os"
 
 	"github.com/pulsoats/analysis/internal/model/run"
@@ -13,6 +14,7 @@ import (
 	"github.com/pulsoats/core/domain/detect/detectors"
 	"github.com/pulsoats/core/domain/market"
 	"github.com/pulsoats/core/errorsx"
+	"github.com/pulsoats/core/lib/logx"
 	"golang.org/x/sync/singleflight"
 
 	dets "github.com/pulsoats/analysis/internal/detect"
@@ -27,6 +29,7 @@ type ServiceConfig struct {
 	DetectService    *dets.Service
 	DetectorRegistry *detectors.Registry
 	StorageDir       string
+	Logger           *slog.Logger
 }
 
 type service struct {
@@ -36,10 +39,15 @@ type service struct {
 	detRegistry *detectors.Registry
 	detectSvc   *dets.Service
 	storageDir  string
+	log         *slog.Logger
 	candlesSF   singleflight.Group
 }
 
 func NewService(cfg ServiceConfig) run.Service {
+	l := cfg.Logger
+	if l == nil {
+		l = logx.Discard()
+	}
 	return &service{
 		repo:        cfg.Repository,
 		candleRepo:  cfg.CandleRepository,
@@ -47,6 +55,7 @@ func NewService(cfg ServiceConfig) run.Service {
 		detRegistry: cfg.DetectorRegistry,
 		detectSvc:   cfg.DetectService,
 		storageDir:  cfg.StorageDir,
+		log:         l.With("component", "run.service"),
 	}
 }
 
@@ -74,16 +83,27 @@ func (s *service) StartRun(ctx context.Context, req run.Request) (int64, error) 
 		return 0, fmt.Errorf("start run: create run: %w", err)
 	}
 
+	s.log.Info("run queued",
+		"run_id", record.ID,
+		"exchange", req.Market.Exchange,
+		"symbol", req.Market.Symbol,
+		"detector", req.Detector.Code,
+	)
+
 	go s.runAsync(record.ID, req)
 
 	return record.ID, nil
 }
 
 func (s *service) runAsync(runID int64, req run.Request) {
+	log := s.log.With("run_id", runID)
 	ctx := context.Background()
 	_ = s.repo.UpdateStatus(ctx, runID, run.Status{Code: run.StatusRunning})
 
+	log.Info("run started")
+
 	if err := s.executeRun(ctx, runID, req); err != nil {
+		log.Error("run failed", "err", err)
 		var msg string
 		unwrappedError := errors.Unwrap(err)
 		if unwrappedError != nil {
@@ -96,6 +116,7 @@ func (s *service) runAsync(runID int64, req run.Request) {
 		return
 	}
 
+	log.Info("run completed")
 	_ = s.repo.UpdateStatus(ctx, runID, run.Status{Code: run.StatusDone})
 }
 
@@ -183,10 +204,13 @@ func (s *service) executeRun(ctx context.Context, runID int64, cfg run.Request) 
 	if err != nil {
 		return fmt.Errorf("execute run: fetch candles: %w", err)
 	}
+	s.log.Debug("candles fetched", "run_id", runID, "count", len(candles))
+
 	signals, err := s.detectSvc.Run(ctx, candles, *fees, det)
 	if err != nil {
 		return fmt.Errorf("execute run: detect signals: %w", errors.Join(errorsx.ErrInternal, err))
 	}
+	s.log.Debug("signals detected", "run_id", runID, "count", len(signals))
 
 	res, err := s.processResult(ctx, processRunRequest{
 		signals:   signals,

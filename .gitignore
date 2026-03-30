@@ -40,6 +40,11 @@ tmp/
 *.local
 
 # =====================
+# Claude Code
+# =====================
+.claude/
+
+# =====================
 # IDE / Editors
 # =====================
 # JetBrains (GoLand, IntelliJ)
