@@ -84,9 +84,14 @@ func (s *service) runAsync(runID int64, req run.Request) {
 	_ = s.repo.UpdateStatus(ctx, runID, run.Status{Code: run.StatusRunning})
 
 	if err := s.executeRun(ctx, runID, req); err != nil {
+		var msg string
+		unwrappedError := errors.Unwrap(err)
+		if unwrappedError != nil {
+			msg = unwrappedError.Error()
+		}
 		_ = s.repo.UpdateStatus(ctx, runID, run.Status{
 			Code:    run.StatusFailed,
-			Message: err.Error(),
+			Message: msg,
 		})
 		return
 	}
