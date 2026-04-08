@@ -7,8 +7,10 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"path/filepath"
+	"strconv"
 
-	"github.com/pulsoats/analysis/internal/model/run"
+	"github.com/pulsoats/analysis/internal/domain/run"
 	"github.com/pulsoats/analysis/internal/utils/files"
 	"github.com/pulsoats/core/domain/detect"
 	"github.com/pulsoats/core/domain/detect/detectors"
@@ -18,48 +20,51 @@ import (
 	"golang.org/x/sync/singleflight"
 
 	dets "github.com/pulsoats/analysis/internal/detect"
-	"github.com/pulsoats/analysis/internal/model"
+	"github.com/pulsoats/analysis/internal/domain"
 	"github.com/pulsoats/core/domain/exchange"
 )
 
 type ServiceConfig struct {
 	Repository       run.Repository
-	CandleRepository model.CandleRepository
+	CandleRepository domain.CandleRepository
 	Exchanges        map[string]exchange.API
 	DetectService    *dets.Service
 	DetectorRegistry *detectors.Registry
 	StorageDir       string
 	Logger           *slog.Logger
+	TxManager        domain.TxManager
 }
 
-type service struct {
+type Service struct {
 	repo        run.Repository
-	candleRepo  model.CandleRepository
+	candleRepo  domain.CandleRepository
 	exchanges   map[string]exchange.API
 	detRegistry *detectors.Registry
 	detectSvc   *dets.Service
 	storageDir  string
 	log         *slog.Logger
 	candlesSF   singleflight.Group
+	tx          domain.TxManager
 }
 
-func NewService(cfg ServiceConfig) run.Service {
+func NewService(cfg ServiceConfig) *Service {
 	l := cfg.Logger
 	if l == nil {
 		l = logx.Discard()
 	}
-	return &service{
+	return &Service{
 		repo:        cfg.Repository,
 		candleRepo:  cfg.CandleRepository,
 		exchanges:   cfg.Exchanges,
 		detRegistry: cfg.DetectorRegistry,
 		detectSvc:   cfg.DetectService,
 		storageDir:  cfg.StorageDir,
-		log:         l.With("component", "run.service"),
+		log:         l.With("component", "run.Service"),
+		tx:          cfg.TxManager,
 	}
 }
 
-func (s *service) StartRun(ctx context.Context, req run.Request) (int64, error) {
+func (s *Service) StartRun(ctx context.Context, req run.Request) (int64, error) {
 	if err := req.Validate(); err != nil {
 		return 0, fmt.Errorf("start run: %w", err)
 	}
@@ -95,7 +100,7 @@ func (s *service) StartRun(ctx context.Context, req run.Request) (int64, error) 
 	return record.ID, nil
 }
 
-func (s *service) runAsync(runID int64, req run.Request) {
+func (s *Service) runAsync(runID int64, req run.Request) {
 	log := s.log.With("run_id", runID)
 	ctx := context.Background()
 	_ = s.repo.UpdateStatus(ctx, runID, run.Status{Code: run.StatusRunning})
@@ -120,7 +125,7 @@ func (s *service) runAsync(runID int64, req run.Request) {
 	_ = s.repo.UpdateStatus(ctx, runID, run.Status{Code: run.StatusDone})
 }
 
-func (s *service) Status(ctx context.Context, runID int64) (run.Status, error) {
+func (s *Service) Status(ctx context.Context, runID int64) (run.Status, error) {
 	status, err := s.repo.StatusByRunID(ctx, runID)
 	if err != nil {
 		return run.Status{}, fmt.Errorf("get run status: %w", err)
@@ -128,7 +133,7 @@ func (s *service) Status(ctx context.Context, runID int64) (run.Status, error) {
 	return status, nil
 }
 
-func (s *service) StreamRunResult(ctx context.Context, runID int64, w io.Writer) error {
+func (s *Service) StreamRunResult(ctx context.Context, runID int64, w io.Writer) error {
 	st, err := s.repo.StatusByRunID(ctx, runID)
 	if err != nil {
 		return fmt.Errorf("stream run result: %w", err)
@@ -152,7 +157,7 @@ func (s *service) StreamRunResult(ctx context.Context, runID int64, w io.Writer)
 	return nil
 }
 
-func (s *service) FindByID(ctx context.Context, runID int64) (run.Run, error) {
+func (s *Service) FindByID(ctx context.Context, runID int64) (run.Run, error) {
 	r, err := s.repo.RunByID(ctx, runID)
 	if err != nil {
 		return run.Run{}, fmt.Errorf("get run meta: %w", err)
@@ -160,18 +165,48 @@ func (s *service) FindByID(ctx context.Context, runID int64) (run.Run, error) {
 	return r, nil
 }
 
-func (s *service) ListRunsPaged(ctx context.Context, limit int, beforeID *int64, callerID string, filter run.RunFilter) ([]run.Run, bool, *int64, error) {
+func (s *Service) ListRunsPaged(ctx context.Context, limit int, beforeID *int64, callerID string, filter run.Filter) ([]run.Run, bool, *int64, error) {
 	return s.repo.ListRunsPaged(ctx, limit, beforeID, callerID, filter)
 }
 
-func (s *service) ShareRun(ctx context.Context, runID int64, callerID string) error {
+func (s *Service) ShareRun(ctx context.Context, runID int64, callerID string) error {
 	if err := s.repo.ShareRun(ctx, runID, callerID); err != nil {
 		return fmt.Errorf("share run: %w", err)
 	}
 	return nil
 }
 
-func (s *service) executeRun(ctx context.Context, runID int64, cfg run.Request) error {
+func (s *Service) DeleteRun(ctx context.Context, runID int64, userID string) error {
+	err := s.tx.WithinTx(ctx, func(txCtx context.Context) error {
+		r, err := s.repo.RunByID(ctx, runID)
+		if err != nil {
+			return err
+		}
+
+		if r.CreatedBy != userID {
+			return errorsx.ErrForbidden
+		}
+
+		if err := s.repo.DeleteRun(ctx, runID); err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return fmt.Errorf("delete run: %w", err)
+	}
+
+	err = os.Remove(filepath.Join(s.storageDir, "run_"+strconv.FormatInt(runID, 10)) + ".zip")
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return nil
+		}
+		return fmt.Errorf("delete run: delete archive: %w", errors.Join(errorsx.ErrInternal, err))
+	}
+	return nil
+}
+
+func (s *Service) executeRun(ctx context.Context, runID int64, cfg run.Request) error {
 	optsAny, err := s.detRegistry.UnmarshalOpts(cfg.Detector.Code, cfg.Detector.Opts)
 	if err != nil {
 		return fmt.Errorf("execute run: decode detector opts: %w", errors.Join(errorsx.ErrInternal, err))

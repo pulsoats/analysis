@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/pulsoats/analysis/internal/model"
+	"github.com/pulsoats/analysis/internal/domain"
 	"github.com/pulsoats/core/domain/detect"
 	"github.com/pulsoats/core/domain/market"
 )
@@ -16,8 +16,8 @@ func NewDetectService() *Service {
 	return &Service{}
 }
 
-func (svc *Service) Run(ctx context.Context, marketData []market.Candle, fees market.TakerMakerFees, detector detect.CandleDetector) ([]model.AnalysisSignal, error) {
-	res := make([]model.AnalysisSignal, 0, 128)
+func (svc *Service) Run(ctx context.Context, marketData []market.Candle, fees market.TakerMakerFees, detector detect.CandleDetector) ([]domain.AnalysisSignal, error) {
+	res := make([]domain.AnalysisSignal, 0, 128)
 	ws := detector.WindowSize()
 	seen := make(map[uuid.UUID]struct{})
 	for i := ws - 1; i < len(marketData); i++ {
@@ -40,7 +40,7 @@ func (svc *Service) Run(ctx context.Context, marketData []market.Candle, fees ma
 		}
 
 		seen[sig.Fingerprint] = struct{}{}
-		res = append(res, model.AnalysisSignal{Signal: sig, Index: i})
+		res = append(res, domain.AnalysisSignal{Signal: sig, Index: i})
 	}
 
 	return res, nil

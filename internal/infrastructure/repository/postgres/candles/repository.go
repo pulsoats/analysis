@@ -8,7 +8,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pulsoats/analysis/internal/model"
+	"github.com/pulsoats/analysis/internal/domain"
 	"github.com/pulsoats/core/domain/market"
 	"github.com/pulsoats/core/errorsx"
 )
@@ -17,7 +17,7 @@ type repo struct {
 	pool *pgxpool.Pool
 }
 
-func NewRepository(pool *pgxpool.Pool) model.CandleRepository {
+func NewRepository(pool *pgxpool.Pool) domain.CandleRepository {
 	return &repo{pool: pool}
 }
 

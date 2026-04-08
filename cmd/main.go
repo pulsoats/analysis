@@ -7,10 +7,10 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/pulsoats/analysis/internal/application/run"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres/candles"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres/runs"
-	"github.com/pulsoats/analysis/internal/service/run"
 	"github.com/rs/zerolog/log"
 
 	"github.com/pulsoats/analysis/internal/detect"
@@ -43,7 +43,8 @@ func main() {
 	}
 
 	candleRepo := candles.NewRepository(pool)
-	runRepo := runs.NewRepository(pool)
+	qp := postgres.NewQuerierProvider(pool)
+	runRepo := runs.NewRepository(qp)
 
 	storageDir := os.Getenv("ANALYSIS_STORAGE_DIR")
 	if storageDir == "" {

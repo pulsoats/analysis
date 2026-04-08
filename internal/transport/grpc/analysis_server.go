@@ -6,13 +6,13 @@ import (
 	"log/slog"
 	"strconv"
 
-	"github.com/pulsoats/analysis/internal/model/run"
+	"github.com/pulsoats/analysis/internal/domain/run"
 	"github.com/pulsoats/analysis/internal/transport/grpc/errorx"
-	"github.com/pulsoats/core/lib/logx"
 	analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
+	"github.com/pulsoats/core/lib/logx"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 const (
@@ -22,7 +22,7 @@ const (
 
 type AnalysisServer struct {
 	analysispb.UnimplementedAnalysisServer
-	runUC run.Service
+	runUC app
 	log   *slog.Logger
 }
 
@@ -37,7 +37,7 @@ func WithLogger(l *slog.Logger) Option {
 	}
 }
 
-func NewAnalysisServer(runUC run.Service, opts ...Option) *AnalysisServer {
+func NewAnalysisServer(runUC app, opts ...Option) *AnalysisServer {
 	s := &AnalysisServer{
 		runUC: runUC,
 		log:   logx.Discard(),
@@ -176,14 +176,11 @@ func (s *AnalysisServer) ListRunsPaged(ctx context.Context, req *analysispb.List
 		log = log.With("before_id", beforeIDRaw)
 	}
 
-	callerID, err := callerIDFromCtx(ctx)
-	if err != nil {
-		return nil, err
-	}
+	userID := req.GetUser_Id()
 
 	filter := mapRunFilter(req.GetFilter())
 
-	runs, hasMore, nextBeforeID, err := s.runUC.ListRunsPaged(ctx, int(limit), beforeID, callerID, filter)
+	runs, hasMore, nextBeforeID, err := s.runUC.ListRunsPaged(ctx, int(limit), beforeID, userID, filter)
 	if err != nil {
 		st := errorx.ToStatus(err)
 		if st.Code() == codes.NotFound {
@@ -226,12 +223,12 @@ func (s *AnalysisServer) ShareRun(ctx context.Context, req *analysispb.ShareRunR
 		return nil, status.Error(codes.InvalidArgument, "invalid run_id")
 	}
 
-	callerID, err := callerIDFromCtx(ctx)
-	if err != nil {
-		return nil, err
+	userID := req.GetUserId()
+	if userID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id")
 	}
 
-	if err := s.runUC.ShareRun(ctx, runID, callerID); err != nil {
+	if err := s.runUC.ShareRun(ctx, runID, userID); err != nil {
 		st := errorx.ToStatus(err)
 		if st.Code() == codes.NotFound {
 			log.Warn("run not found or not owned by caller", "run_id", runID, "err", err)
@@ -244,6 +241,35 @@ func (s *AnalysisServer) ShareRun(ctx context.Context, req *analysispb.ShareRunR
 	return &analysispb.ShareRunResponse{Success: true}, nil
 }
 
+func (s *AnalysisServer) DeleteRun(ctx context.Context, req *analysispb.DeleteRunRequest) (*emptypb.Empty, error) {
+	log := s.log.With("grpc_method", "DeleteRun")
+	if req == nil {
+		log.Warn("nil request received")
+		return nil, status.Error(codes.InvalidArgument, "nil request")
+	}
+
+	runID, err := parseRunID(req.GetRunId())
+	if err != nil {
+		return nil, status.Error(codes.InvalidArgument, "invalid run_id")
+	}
+
+	userID := req.GetUserId()
+	if userID == "" {
+		return nil, status.Errorf(codes.InvalidArgument, "invalid user_id")
+	}
+
+	err = s.runUC.DeleteRun(ctx, runID, userID)
+	if err != nil {
+		st := errorx.ToStatus(err)
+		if st.Code() == codes.NotFound {
+			log.Warn("run not found or not owned by caller", "run_id", runID, "err", err)
+			return nil, status.Error(codes.NotFound, "run not found or not yours")
+		}
+		return nil, status.Error(st.Code(), st.Message())
+	}
+	return &emptypb.Empty{}, nil
+}
+
 func parseRunID(runID string) (int64, error) {
 	if runID == "" {
 		return 0, fmt.Errorf("run_id is empty")
@@ -253,16 +279,4 @@ func parseRunID(runID string) (int64, error) {
 		return 0, fmt.Errorf("run_id must be a numeric string: %w", err)
 	}
 	return parsed, nil
-}
-
-func callerIDFromCtx(ctx context.Context) (string, error) {
-	md, ok := metadata.FromIncomingContext(ctx)
-	if !ok {
-		return "", status.Error(codes.Unauthenticated, "missing metadata")
-	}
-	vals := md.Get("user-id")
-	if len(vals) == 0 || vals[0] == "" {
-		return "", status.Error(codes.Unauthenticated, "missing user-id in metadata")
-	}
-	return vals[0], nil
 }

@@ -25,7 +25,7 @@ func timeBounds(candles []market.Candle) (time.Time, time.Time) {
 	return time.UnixMilli(minTS).UTC(), time.UnixMilli(maxTS).UTC()
 }
 
-func (s *service) runZipPath(runID int64) string {
+func (s *Service) runZipPath(runID int64) string {
 	filename := fmt.Sprintf("run_%d.zip", runID)
 	return filepath.Join(s.storageDir, filename)
 }

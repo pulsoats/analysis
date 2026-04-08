@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/pulsoats/analysis/internal/model/run"
+	"github.com/pulsoats/analysis/internal/domain/run"
 	analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
 	commonpb "github.com/pulsoats/contracts/gen/go/common/v1"
 	"github.com/pulsoats/core/domain/detect"
@@ -105,7 +105,7 @@ func mapRunMeta(r run.Run) *analysispb.RunMeta {
 		Market:    mapMarketSpec(r.Market),
 		Interval:  r.Interval.String(),
 		PriceType: string(r.PriceType),
-		Detector: mapDetectorsResponse(r.Detector),
+		Detector:  mapDetectorsResponse(r.Detector),
 		SignalsCount: func() int64 {
 			if r.SignalsCount == nil {
 				return 0
@@ -134,16 +134,16 @@ func mapRunMeta(r run.Run) *analysispb.RunMeta {
 	return meta
 }
 
-func mapRunFilter(f analysispb.RunFilter) run.RunFilter {
+func mapRunFilter(f analysispb.RunFilter) run.Filter {
 	switch f {
 	case analysispb.RunFilter_RUN_FILTER_MINE:
-		return run.RunFilterMine
+		return run.FilterMine
 	case analysispb.RunFilter_RUN_FILTER_SHARED:
-		return run.RunFilterShared
+		return run.FilterShared
 	case analysispb.RunFilter_RUN_FILTER_ALL:
-		return run.RunFilterAll
+		return run.FilterAll
 	default:
-		return run.RunFilterUnspecified
+		return run.FilterUnspecified
 	}
 }
 

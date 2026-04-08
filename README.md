@@ -1,4 +1,4 @@
-# Analysis Service
+# Analysis app
 
 Сервис бэктестинга детекторов теханализа из `pulsoats/core`. Через gRPC он запускает вычислительные «раны» по историческим свечам, хранит метаданные и кэш данных в PostgreSQL, а результат каждого прогона собирает в ZIP‑архив со свечами и найденными сигналами.
 
@@ -10,7 +10,7 @@
 
 ## Поток обработки
 1. gRPC вызывает `StartRun`, `internal/transport/grpc` мапит protobuf в `internal/model/newRun.Request`.
-2. `internal/service/newRun.Service` валидирует параметры и создаёт запись в `analysis_runs` со статусом `pending`, затем в фоне запускает вычисление.
+2. `internal/app/newRun.app` валидирует параметры и создаёт запись в `analysis_runs` со статусом `pending`, затем в фоне запускает вычисление.
 3. Во время вычисления сервис:
    - получает нужные свечи через зарегистрированные биржевые API (`github.com/pulsoats/core/exchanges`), сначала проверяя кэш `analysis_candles`;
    - строит детектор из `pulsoats/core/detect` и гоняет его на последовательности свечей;
@@ -19,11 +19,11 @@
 4. Финальный статус `done` или `failed` обновляется в `analysis_runs`, а архив лежит в `ANALYSIS_STORAGE_DIR`.
 
 - `cmd/main.go` — точка входа: логгер (`zerolog`), пул PostgreSQL (`pgxpool`), регистры детекторов и бирж, gRPC сервер;
-- `internal/service/newRun` — доменная логика бэктеста, работа с `detectors.Registry`, singleflight-кэш для свечей и сбор ZIP;
+- `internal/app/newRun` — доменная логика бэктеста, работа с `detectors.Registry`, singleflight-кэш для свечей и сбор ZIP;
 - `internal/infrastructure/repository/postgres` — хранилище запусков (`runs.Repository`) и локальный кэш свечей (`candles.Repository`);
 - `internal/detect` — адаптер ядра `pulsoats/core/detect`;
 - `internal/transport/grpc` — сервер `analysis.v1.AnalysisService`, error mapping и стриминг архива;
-- `internal/utils/files` — генераторы CSV/ZIP, используются `service.newRun`.
+- `internal/utils/files` — генераторы CSV/ZIP, используются `app.newRun`.
 
 ## Конфигурация
 - `POSTGRES_DSN` — обязательный DSN подключения;
@@ -45,7 +45,7 @@
 ## Структура репозитория
 ```
 cmd/                    входной бинарь
-internal/service/newRun    бизнес-логика бэктеста
+internal/app/newRun    бизнес-логика бэктеста
 internal/transport      gRPC сервер и мапперы
 internal/infrastructure доступ к PostgreSQL
 internal/utils/files    генерация CSV/ZIP

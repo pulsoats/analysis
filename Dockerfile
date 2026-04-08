@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
         printf "machine github.com\nlogin %s\npassword x-oauth-basic\n" "$GITHUB_TOKEN" > /root/.netrc; \
         chmod 600 /root/.netrc; \
     fi; \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/analysis-service ./cmd; \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/analysis-app ./cmd; \
     rm -f /root/.netrc
 
 FROM debian:bookworm-slim
@@ -45,7 +45,7 @@ RUN useradd -r -u 10001 analysis \
 
 WORKDIR /app
 
-COPY --from=builder /out/analysis-service /usr/local/bin/analysis-service
+COPY --from=builder /out/analysis-app /usr/local/bin/analysis-app
 
 ENV ANALYSIS_STORAGE_DIR=/data/runs \
     ANALYSIS_GRPC_ADDR=:50051
@@ -54,4 +54,4 @@ EXPOSE 50051
 VOLUME ["/data"]
 
 USER analysis
-ENTRYPOINT ["/usr/local/bin/analysis-service"]
+ENTRYPOINT ["/usr/local/bin/analysis-app"]

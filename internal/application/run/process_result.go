@@ -7,7 +7,7 @@ import (
 	"time"
 
 	detsvc "github.com/pulsoats/analysis/internal/detect"
-	"github.com/pulsoats/analysis/internal/model"
+	"github.com/pulsoats/analysis/internal/domain"
 	"github.com/pulsoats/core/domain/detect"
 	"github.com/pulsoats/core/domain/exchange"
 	"github.com/pulsoats/core/domain/market"
@@ -16,7 +16,7 @@ import (
 const minTF = market.Interval1m
 
 type processRunRequest struct {
-	signals   []model.AnalysisSignal
+	signals   []domain.AnalysisSignal
 	candles   []market.Candle
 	detector  detect.CandleDetector
 	exApi     exchange.API
@@ -27,11 +27,11 @@ type processRunRequest struct {
 }
 
 type processRunResult struct {
-	signals      []model.AnalysisSignal
+	signals      []domain.AnalysisSignal
 	avgProfitPPM int64
 }
 
-func (s *service) processResult(ctx context.Context, req processRunRequest) (processRunResult, error) {
+func (s *Service) processResult(ctx context.Context, req processRunRequest) (processRunResult, error) {
 	var (
 		sumProfit int64
 	)
@@ -44,7 +44,7 @@ func (s *service) processResult(ctx context.Context, req processRunRequest) (pro
 	barsForBuy := req.detector.BarsForBuy() * ratio
 	barsForSell := req.detector.BarsForSell() * ratio
 
-	res := make([]model.AnalysisSignal, 0, len(req.signals))
+	res := make([]domain.AnalysisSignal, 0, len(req.signals))
 
 	for _, sig := range req.signals {
 		signalIdx := sig.Index
@@ -77,7 +77,7 @@ func (s *service) processResult(ctx context.Context, req processRunRequest) (pro
 			return processRunResult{}, fmt.Errorf("process run result: signal status: %w", err)
 		}
 
-		sig.Signal.Status = resp.SignalStatus
+		sig.Status = resp.SignalStatus
 		sig.Signal.ExpectedReturnPPM = resp.ExpectedReturnPPM
 		sig.BuyTime = resp.BuyTime
 		sig.SellTime = resp.SellTime

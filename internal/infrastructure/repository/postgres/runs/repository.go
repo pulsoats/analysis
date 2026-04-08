@@ -6,18 +6,18 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pulsoats/analysis/internal/model/run"
+	"github.com/pulsoats/analysis/internal/domain/run"
+	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres"
 	"github.com/pulsoats/core/domain/market"
 	"github.com/pulsoats/core/errorsx"
 )
 
 type repo struct {
-	pool *pgxpool.Pool
+	qp postgres.QuerierProvider
 }
 
-func NewRepository(pool *pgxpool.Pool) run.Repository {
-	return &repo{pool: pool}
+func NewRepository(qp postgres.QuerierProvider) run.Repository {
+	return &repo{qp: qp}
 }
 
 func (r *repo) CreateRun(ctx context.Context, runModel *run.Run, status run.Status) error {
@@ -31,7 +31,10 @@ func (r *repo) CreateRun(ctx context.Context, runModel *run.Run, status run.Stat
 			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
 			RETURNING id, created_at;
 	`
-	err := r.pool.QueryRow(ctx, query,
+
+	q := r.qp.Get(ctx)
+
+	err := q.QueryRow(ctx, query,
 		runModel.Market.Exchange,
 		runModel.Market.Category,
 		runModel.Market.Symbol,
@@ -59,7 +62,10 @@ func (r *repo) UpdateStatus(ctx context.Context, runID int64, status run.Status)
 		SET status_code = $2, status_message = $3
 		WHERE id = $1;
 	`
-	tag, err := r.pool.Exec(ctx, query, runID, status.Code, status.Message)
+
+	q := r.qp.Get(ctx)
+
+	tag, err := q.Exec(ctx, query, runID, status.Code, status.Message)
 	if err != nil {
 		return fmt.Errorf("update run status: %w", errors.Join(errorsx.ErrInternal, err))
 	}
@@ -78,7 +84,10 @@ func (r *repo) UpdateResult(ctx context.Context, res run.Run) error {
 		    avg_profit_ppm = $5
 		WHERE id = $1;
 	`
-	tag, err := r.pool.Exec(ctx, query,
+
+	q := r.qp.Get(ctx)
+
+	tag, err := q.Exec(ctx, query,
 		res.ID,
 		res.From,
 		res.To,
@@ -100,8 +109,11 @@ func (r *repo) StatusByRunID(ctx context.Context, runID int64) (run.Status, erro
 		FROM analysis.runs
 		WHERE id = $1;
 	`
+
+	q := r.qp.Get(ctx)
+
 	var st run.Status
-	err := r.pool.QueryRow(ctx, query, runID).Scan(&st.Code, &st.Message)
+	err := q.QueryRow(ctx, query, runID).Scan(&st.Code, &st.Message)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return run.Status{}, fmt.Errorf("get run status: %w", errorsx.ErrNotFound)
@@ -137,9 +149,11 @@ func (r *repo) RunByID(ctx context.Context, runID int64) (run.Run, error) {
 		WHERE id = $1;
 	`
 
+	q := r.qp.Get(ctx)
+
 	var res run.Run
 	var interval string
-	err := r.pool.QueryRow(ctx, query, runID).Scan(
+	err := q.QueryRow(ctx, query, runID).Scan(
 		&res.ID,
 		&res.Market.Exchange,
 		&res.Market.Category,
@@ -172,7 +186,7 @@ func (r *repo) RunByID(ctx context.Context, runID int64) (run.Run, error) {
 	return res, nil
 }
 
-func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *int64, callerID string, filter run.RunFilter) ([]run.Run, bool, *int64, error) {
+func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *int64, callerID string, filter run.Filter) ([]run.Run, bool, *int64, error) {
 	// $1 = beforeID, $2 = limit+1, $3 = callerID
 	const (
 		queryMine = `
@@ -216,15 +230,17 @@ func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *int64, ca
 			LIMIT $2;`
 	)
 
+	q := r.qp.Get(ctx)
+
 	query := queryMine
 	switch filter {
-	case run.RunFilterShared:
+	case run.FilterShared:
 		query = queryShared
-	case run.RunFilterAll:
+	case run.FilterAll:
 		query = queryAll
 	}
 
-	rows, err := r.pool.Query(ctx, query, beforeID, limit+1, callerID)
+	rows, err := q.Query(ctx, query, beforeID, limit+1, callerID)
 	if err != nil {
 		return nil, false, nil, fmt.Errorf("list runs paged: %w", errors.Join(errorsx.ErrInternal, err))
 	}
@@ -288,12 +304,34 @@ func (r *repo) ShareRun(ctx context.Context, runID int64, callerID string) error
 		SET is_shared = true, shared_at = NOW()
 		WHERE id = $1 AND created_by = $2;
 	`
-	tag, err := r.pool.Exec(ctx, query, runID, callerID)
+
+	q := r.qp.Get(ctx)
+
+	tag, err := q.Exec(ctx, query, runID, callerID)
 	if err != nil {
 		return fmt.Errorf("share run: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("share run: %w", errorsx.ErrNotFound)
+	}
+	return nil
+}
+
+func (r *repo) DeleteRun(ctx context.Context, runID int64) error {
+	const query = `
+	DELETE
+	FROM analysis.runs
+	WHERE id = $1
+	`
+
+	q := r.qp.Get(ctx)
+
+	tag, err := q.Exec(ctx, query, runID)
+	if err != nil {
+		return fmt.Errorf("delete run: %w", errors.Join(errorsx.ErrInternal, err))
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("delete run: %w", errorsx.ErrNotFound)
 	}
 	return nil
 }

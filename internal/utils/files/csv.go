@@ -9,26 +9,26 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pulsoats/analysis/internal/model"
+	"github.com/pulsoats/analysis/internal/domain"
 	"github.com/pulsoats/core/domain/market"
-	corecsv "github.com/pulsoats/core/lib/csv"
 	"github.com/pulsoats/core/errorsx"
+	corecsv "github.com/pulsoats/core/lib/csv"
 	"github.com/pulsoats/core/lib/format"
 	"github.com/pulsoats/core/lib/units"
 )
 
-func BuildSignalsCSV(ctx context.Context, w io.Writer, runID string, signals []model.AnalysisSignal) error {
+func BuildSignalsCSV(ctx context.Context, w io.Writer, runID string, signals []domain.AnalysisSignal) error {
 	if len(signals) == 0 {
 		return nil
 	}
 
-	slices.SortFunc(signals, func(a, b model.AnalysisSignal) int {
+	slices.SortFunc(signals, func(a, b domain.AnalysisSignal) int {
 		return int(a.Time - b.Time)
 	})
 
-	sw, err := corecsv.NewWriter[model.AnalysisSignal](
+	sw, err := corecsv.NewWriter[domain.AnalysisSignal](
 		w,
-		func(sig model.AnalysisSignal) []string {
+		func(sig domain.AnalysisSignal) []string {
 			return encodeAnalysisSignal(runID, sig)
 		},
 		corecsv.WithHeader([]string{
@@ -74,7 +74,7 @@ func BuildCandlesCSV(ctx context.Context, w io.Writer, candles []market.Candle) 
 	return cw.Close()
 }
 
-func encodeAnalysisSignal(runID string, sig model.AnalysisSignal) []string {
+func encodeAnalysisSignal(runID string, sig domain.AnalysisSignal) []string {
 	timeStr := time.UnixMilli(sig.Time).UTC().Format(time.RFC3339)
 
 	profitability := float64(sig.ExpectedReturnPPM) / 10_000

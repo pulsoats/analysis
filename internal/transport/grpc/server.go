@@ -7,8 +7,8 @@ import (
 	"net"
 
 	"github.com/pulsoats/analysis/internal/transport/grpc/middleware"
-	"github.com/pulsoats/core/lib/logx"
 	analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
+	"github.com/pulsoats/core/lib/logx"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )

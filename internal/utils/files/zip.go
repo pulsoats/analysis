@@ -9,13 +9,13 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"github.com/pulsoats/analysis/internal/model"
-	"github.com/pulsoats/analysis/internal/model/run"
+	"github.com/pulsoats/analysis/internal/domain"
+	"github.com/pulsoats/analysis/internal/domain/run"
 	"github.com/pulsoats/core/domain/market"
 	"github.com/pulsoats/core/errorsx"
 )
 
-func BuildZipResult(ctx context.Context, zipPath string, run run.Run, candles []market.Candle, signals []model.AnalysisSignal) error {
+func BuildZipResult(ctx context.Context, zipPath string, run run.Run, candles []market.Candle, signals []domain.AnalysisSignal) error {
 	if err := os.MkdirAll(filepath.Dir(zipPath), 0o755); err != nil {
 		return fmt.Errorf("build zip result: make dir: %w", errors.Join(errorsx.ErrInternal, err))
 	}

@@ -21,6 +21,8 @@ func ToStatus(err error) *status.Status {
 		return status.New(codes.InvalidArgument, err.Error())
 	case errors.Is(err, errorsx.ErrInternal):
 		return status.New(codes.Internal, "internal server error")
+	case errors.Is(err, errorsx.ErrForbidden):
+		return status.New(codes.PermissionDenied, "forbidden")
 	default:
 		return status.New(codes.Unknown, err.Error())
 	}

@@ -43,6 +43,7 @@ tmp/
 # Claude Code
 # =====================
 .claude/
+memory/
 
 # =====================
 # IDE / Editors

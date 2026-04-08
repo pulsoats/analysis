@@ -20,13 +20,11 @@ func CandlesFilename(m CandlesFileMeta) string {
 	from := m.From.UTC().Format("20060102")
 	to := m.To.UTC().Format("20060102")
 
-	intervalSlug, _ := formatIntervalSlug(m.Interval)
-
 	return fmt.Sprintf(
 		"candles_%s_%s_%s_%s_%s-%s.csv",
 		m.Exchange,
 		m.Category,
-		intervalSlug,
+		m.Interval,
 		m.Symbol,
 		from,
 		to,

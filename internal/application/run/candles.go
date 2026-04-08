@@ -12,7 +12,7 @@ import (
 	"github.com/pulsoats/core/errorsx"
 )
 
-func (s *service) fetchCandles(ctx context.Context, spec market.CandleSpec, from, to time.Time, priceType market.PriceType) ([]market.Candle, error) {
+func (s *Service) fetchCandles(ctx context.Context, spec market.CandleSpec, from, to time.Time, priceType market.PriceType) ([]market.Candle, error) {
 	if !from.Before(to) {
 		return nil, fmt.Errorf("fetch candles: from %s >= to %s: %w", from, to, errorsx.ErrInvalidArgument)
 	}
@@ -34,7 +34,7 @@ func (s *service) fetchCandles(ctx context.Context, spec market.CandleSpec, from
 	return v.([]market.Candle), nil
 }
 
-func (s *service) loadCandlesRange(
+func (s *Service) loadCandlesRange(
 	ctx context.Context,
 	api exchange.API,
 	spec market.CandleSpec,

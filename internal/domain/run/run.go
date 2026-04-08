@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"time"
 
 	"github.com/pulsoats/core/domain/detect"
@@ -18,13 +17,13 @@ const (
 	StatusFailed
 )
 
-type RunFilter int
+type Filter int
 
 const (
-	RunFilterUnspecified RunFilter = iota
-	RunFilterMine
-	RunFilterShared
-	RunFilterAll
+	FilterUnspecified Filter = iota
+	FilterMine
+	FilterShared
+	FilterAll
 )
 
 type Status struct {
@@ -64,15 +63,7 @@ type Repository interface {
 	UpdateResult(ctx context.Context, res Run) error
 	StatusByRunID(ctx context.Context, runID int64) (Status, error)
 	RunByID(ctx context.Context, runID int64) (Run, error)
-	ListRunsPaged(ctx context.Context, limit int, beforeID *int64, callerID string, filter RunFilter) ([]Run, bool, *int64, error)
+	ListRunsPaged(ctx context.Context, limit int, beforeID *int64, callerID string, filter Filter) ([]Run, bool, *int64, error)
 	ShareRun(ctx context.Context, runID int64, callerID string) error
-}
-
-type Service interface {
-	StartRun(ctx context.Context, req Request) (int64, error)
-	Status(ctx context.Context, runID int64) (Status, error)
-	StreamRunResult(ctx context.Context, runID int64, w io.Writer) error
-	FindByID(ctx context.Context, runID int64) (Run, error)
-	ListRunsPaged(ctx context.Context, limit int, beforeID *int64, callerID string, filter RunFilter) ([]Run, bool, *int64, error)
-	ShareRun(ctx context.Context, runID int64, callerID string) error
+	DeleteRun(ctx context.Context, runID int64) error
 }

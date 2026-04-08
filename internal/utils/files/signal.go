@@ -15,13 +15,11 @@ type SignalsFileMeta struct {
 }
 
 func SignalsFilename(m SignalsFileMeta) string {
-	intervalSlug, _ := formatIntervalSlug(m.Interval)
-
 	return fmt.Sprintf(
 		"signals_%s_%s_%s_%s_%s.csv",
 		m.Exchange,
 		m.Category,
-		intervalSlug,
+		m.Interval,
 		m.Symbol,
 		m.RunID,
 	)
