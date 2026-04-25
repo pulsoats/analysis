@@ -8,7 +8,7 @@
 - постраничный список прогонов через `ListRunsPaged`;
 - публикация и удаление прогонов через `ShareRun` и `DeleteRun`;
 - потоковая выгрузка готового архива через `GetRunArchive`;
-- выдача каталога доступных детекторов через `Catalog/ListAvailableDetectors`;
+- выдача каталога доступных детекторов и бирж через `Catalog/ListAvailableDetectors` и `Catalog/ListAvailableExchanges`;
 - health-monitoring через `ServiceMonitor/Info` и `ServiceMonitor/Metrics`;
 - кэширование исторических свечей в PostgreSQL для повторного использования.
 
@@ -27,7 +27,7 @@
 ## Архитектура
 - `cmd/analysis/main.go` — точка входа, wiring приложения, инициализация PostgreSQL, registry детекторов и gRPC server.
 - `internal/application/run` — основной application layer для жизненного цикла прогона.
-- `internal/application/detector` — выдача списка встроенных детекторов.
+- `internal/application/catalog` — выдача списка встроенных детекторов и доступных бирж.
 - `internal/application/health` — service info и runtime metrics.
 - `internal/infrastructure/repository/postgres` — репозитории прогонов, свечей, tx manager и pool.
 - `internal/transport/xgrpc` — gRPC transport, registration сервисов и interceptors.
@@ -52,8 +52,9 @@
 - `ShareRun`
 - `DeleteRun`
 
-Сервис `core.v1.Catalog` реализует:
+Сервис `catalog.v1.Catalog` реализует:
 - `ListAvailableDetectors`
+- `ListAvailableExchanges`
 
 Сервис `health.v1.ServiceMonitor` реализует:
 - `Info`
