@@ -2,18 +2,15 @@ package postgres
 
 import (
 	"context"
-	"fmt"
-	"os"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pulsoats/core/errorsx"
 )
 
-func NewPostgresPool(ctx context.Context) (*pgxpool.Pool, error) {
-	dsn := os.Getenv("POSTGRES_DSN")
+func NewPostgresPool(ctx context.Context, dsn string) (*pgxpool.Pool, error) {
 	if dsn == "" {
-		return nil, fmt.Errorf("environment variable POSTGRES_DSN is not set: %w", errorsx.ErrRequired)
+		return nil, errors.New("dsn is empty")
 	}
 
 	cfg, err := pgxpool.ParseConfig(dsn)

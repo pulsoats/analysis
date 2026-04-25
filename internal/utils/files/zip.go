@@ -7,15 +7,14 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 
-	"github.com/pulsoats/analysis/internal/domain"
 	"github.com/pulsoats/analysis/internal/domain/run"
-	"github.com/pulsoats/core/domain/market"
+	"github.com/pulsoats/analysis/internal/domain/signal"
 	"github.com/pulsoats/core/errorsx"
+	"github.com/pulsoats/core/market"
 )
 
-func BuildZipResult(ctx context.Context, zipPath string, run run.Run, candles []market.Candle, signals []domain.AnalysisSignal) error {
+func BuildZipResult(ctx context.Context, zipPath string, run run.Run, candles []market.Candle, signals []signal.AnalysisSignal) error {
 	if err := os.MkdirAll(filepath.Dir(zipPath), 0o755); err != nil {
 		return fmt.Errorf("build zip result: make dir: %w", errors.Join(errorsx.ErrInternal, err))
 	}
@@ -39,8 +38,8 @@ func BuildZipResult(ctx context.Context, zipPath string, run run.Run, candles []
 		Category: run.Market.Category,
 		Interval: run.Interval,
 		Symbol:   run.Market.Symbol,
-		From:     *run.From,
-		To:       *run.To,
+		From:     run.FirstCandleTime,
+		To:       run.LastCandleTime,
 	})
 
 	cw, err := zw.Create(candlesEntryName)
@@ -56,14 +55,14 @@ func BuildZipResult(ctx context.Context, zipPath string, run run.Run, candles []
 		Category: run.Market.Category,
 		Interval: run.Interval,
 		Symbol:   run.Market.Symbol,
-		RunID:    strconv.FormatInt(run.ID, 10),
+		RunID:    run.ID.String(),
 	})
 
 	sw, err := zw.Create(signalsEntryName)
 	if err != nil {
 		return fmt.Errorf("build zip result: add signals entry: %w", errors.Join(errorsx.ErrInternal, err))
 	}
-	if err := BuildSignalsCSV(ctx, sw, strconv.FormatInt(run.ID, 10), signals); err != nil {
+	if err := BuildSignalsCSV(ctx, sw, run.ID.String(), signals); err != nil {
 		return fmt.Errorf("build zip result: signals csv: %w", err)
 	}
 

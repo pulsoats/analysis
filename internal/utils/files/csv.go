@@ -9,30 +9,30 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/pulsoats/analysis/internal/domain"
-	"github.com/pulsoats/core/domain/market"
+	"github.com/pulsoats/analysis/internal/domain/signal"
 	"github.com/pulsoats/core/errorsx"
 	corecsv "github.com/pulsoats/core/lib/csv"
 	"github.com/pulsoats/core/lib/format"
 	"github.com/pulsoats/core/lib/units"
+	"github.com/pulsoats/core/market"
 )
 
-func BuildSignalsCSV(ctx context.Context, w io.Writer, runID string, signals []domain.AnalysisSignal) error {
+func BuildSignalsCSV(ctx context.Context, w io.Writer, runID string, signals []signal.AnalysisSignal) error {
 	if len(signals) == 0 {
 		return nil
 	}
 
-	slices.SortFunc(signals, func(a, b domain.AnalysisSignal) int {
+	slices.SortFunc(signals, func(a, b signal.AnalysisSignal) int {
 		return int(a.Time - b.Time)
 	})
 
-	sw, err := corecsv.NewWriter[domain.AnalysisSignal](
+	sw, err := corecsv.NewWriter[signal.AnalysisSignal](
 		w,
-		func(sig domain.AnalysisSignal) []string {
+		func(sig signal.AnalysisSignal) []string {
 			return encodeAnalysisSignal(runID, sig)
 		},
 		corecsv.WithHeader([]string{
-			"id", "run_id", "status", "detector", "time", "value",
+			"id", "run_id", "status", "detector_code", "detector_opts_label", "time", "value",
 			"buy_value", "buy_time", "tp_value", "sl_value", "sell_time",
 			"expected_return_percent", "left_min_time", "left_min_value",
 			"max_time", "max_value", "right_min_time", "right_min_value",
@@ -59,7 +59,7 @@ func BuildCandlesCSV(ctx context.Context, w io.Writer, candles []market.Candle) 
 		w,
 		encodeCandle,
 		corecsv.WithHeader([]string{
-			"time", "open", "high", "low", "close", "volume", "turnover", "price_type",
+			"time", "open", "high", "low", "close", "volume", "turnover",
 		}),
 	)
 	if err != nil {
@@ -74,7 +74,7 @@ func BuildCandlesCSV(ctx context.Context, w io.Writer, candles []market.Candle) 
 	return cw.Close()
 }
 
-func encodeAnalysisSignal(runID string, sig domain.AnalysisSignal) []string {
+func encodeAnalysisSignal(runID string, sig signal.AnalysisSignal) []string {
 	timeStr := time.UnixMilli(sig.Time).UTC().Format(time.RFC3339)
 
 	profitability := float64(sig.ExpectedReturnPPM) / 10_000
@@ -83,7 +83,8 @@ func encodeAnalysisSignal(runID string, sig domain.AnalysisSignal) []string {
 		sig.ID.String(),
 		runID,
 		sig.Status,
-		sig.Detector,
+		sig.DetectorCode,
+		sig.DetectorOptsLabel,
 		timeStr,
 		format.CentsToString(sig.Value),
 		format.CentsToString(sig.BuyValue),
@@ -112,6 +113,5 @@ func encodeCandle(candle market.Candle) []string {
 		format.CentsToString(candle.Close),
 		fmt.Sprintf("%2.f", float64(candle.Volume)/float64(units.PPM)),
 		fmt.Sprintf("%2.f", candle.Turnover),
-		string(candle.PriceType),
 	}
 }

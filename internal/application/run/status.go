@@ -1,10 +1,11 @@
-package detect
+package run
 
 import (
 	"errors"
 
-	"github.com/pulsoats/core/domain/detect"
-	"github.com/pulsoats/core/domain/market"
+	"github.com/pulsoats/core/detect"
+	"github.com/pulsoats/core/lib/units"
+	"github.com/pulsoats/core/market"
 )
 
 var (
@@ -12,7 +13,7 @@ var (
 	ErrNoData = errors.New("no candles after signal")
 )
 
-type SignalStatusRequest struct {
+type signalStatusRequest struct {
 	BarsForTrade []market.Candle // окно после сигнала (свеча сигнала не входит)
 	Signal       detect.Signal
 	BarsForBuy   int
@@ -20,18 +21,18 @@ type SignalStatusRequest struct {
 	Fees         market.TakerMakerFees
 }
 
-type SignalStatusResponse struct {
+type signalStatusResponse struct {
 	SignalStatus      string
 	ExpectedReturnPPM int64
 	BuyTime           int64
 	SellTime          int64
 }
 
-func (svc *Service) SignalStatus(req SignalStatusRequest) (SignalStatusResponse, error) {
-	var resp SignalStatusResponse
+func signalStatus(req signalStatusRequest) (signalStatusResponse, error) {
+	var resp signalStatusResponse
 
 	if len(req.BarsForTrade) == 0 {
-		return SignalStatusResponse{}, ErrNoData
+		return signalStatusResponse{}, ErrNoData
 	}
 
 	buyIndex := -1
@@ -47,7 +48,7 @@ func (svc *Service) SignalStatus(req SignalStatusRequest) (SignalStatusResponse,
 	}
 
 	if buyIndex == -1 {
-		return SignalStatusResponse{}, ErrNoBuy
+		return signalStatusResponse{}, ErrNoBuy
 	}
 
 	end := buyIndex + req.BarsForSell
@@ -92,14 +93,14 @@ func (svc *Service) SignalStatus(req SignalStatusRequest) (SignalStatusResponse,
 	}
 
 	last := req.BarsForTrade[end].Close
-	resp.ExpectedReturnPPM = CalcExpectedReturnPPM(req.Signal, resp.SignalStatus, last, req.Fees)
+	resp.ExpectedReturnPPM = calcExpectedReturnPPM(req.Signal, resp.SignalStatus, last, req.Fees)
 
 	return resp, nil
 }
 
-func CalcExpectedReturnPPM(sig detect.Signal, status string, lastBFSPointValue int64, fees market.TakerMakerFees) int64 {
-	buyWithSpread := sig.BuyValue + (sig.BuyValue*(market.SpreadPPM/2))/market.PPM
-	buyWithFee := buyWithSpread + (buyWithSpread*fees.TakerFeeRate)/market.PPM
+func calcExpectedReturnPPM(sig detect.Signal, status string, lastBFSPointValue int64, fees market.TakerMakerFees) int64 {
+	buyWithSpread := sig.BuyValue + (sig.BuyValue*(market.SpreadPPM/2))/units.PPM
+	buyWithFee := buyWithSpread + (buyWithSpread*fees.TakerFeeRate)/units.PPM
 
 	var exitRaw int64
 	switch status {
@@ -111,9 +112,9 @@ func CalcExpectedReturnPPM(sig detect.Signal, status string, lastBFSPointValue i
 		exitRaw = lastBFSPointValue
 	}
 
-	exitWithSpread := exitRaw - (exitRaw*(market.SpreadPPM/2))/market.PPM
-	exitAfterFee := exitWithSpread - (exitWithSpread*fees.MakerFeeRate)/market.PPM
+	exitWithSpread := exitRaw - (exitRaw*(market.SpreadPPM/2))/units.PPM
+	exitAfterFee := exitWithSpread - (exitWithSpread*fees.MakerFeeRate)/units.PPM
 	pnl := exitAfterFee - buyWithFee
 
-	return (pnl * market.PPM) / buyWithFee
+	return (pnl * units.PPM) / buyWithFee
 }

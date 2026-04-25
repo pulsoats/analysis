@@ -6,32 +6,28 @@ import (
 	"fmt"
 	"time"
 
-	detsvc "github.com/pulsoats/analysis/internal/detect"
-	"github.com/pulsoats/analysis/internal/domain"
-	"github.com/pulsoats/core/domain/detect"
-	"github.com/pulsoats/core/domain/exchange"
-	"github.com/pulsoats/core/domain/market"
+	"github.com/pulsoats/analysis/internal/domain/signal"
+	"github.com/pulsoats/core/detect"
+	"github.com/pulsoats/core/market"
 )
 
 const minTF = market.Interval1m
 
 type processRunRequest struct {
-	signals   []domain.AnalysisSignal
-	candles   []market.Candle
-	detector  detect.CandleDetector
-	exApi     exchange.API
-	market    market.Spec
-	interval  market.Interval
-	priceType market.PriceType
-	fees      market.TakerMakerFees
+	signals  []signal.AnalysisSignal
+	candles  []market.Candle
+	detector detect.CandleDetector
+	market   market.Spec
+	interval market.Interval
+	fees     market.TakerMakerFees
 }
 
 type processRunResult struct {
-	signals      []domain.AnalysisSignal
+	signals      []signal.AnalysisSignal
 	avgProfitPPM int64
 }
 
-func (s *Service) processResult(ctx context.Context, req processRunRequest) (processRunResult, error) {
+func (s *Application) processResult(ctx context.Context, req processRunRequest) (processRunResult, error) {
 	var (
 		sumProfit int64
 	)
@@ -44,7 +40,7 @@ func (s *Service) processResult(ctx context.Context, req processRunRequest) (pro
 	barsForBuy := req.detector.BarsForBuy() * ratio
 	barsForSell := req.detector.BarsForSell() * ratio
 
-	res := make([]domain.AnalysisSignal, 0, len(req.signals))
+	res := make([]signal.AnalysisSignal, 0, len(req.signals))
 
 	for _, sig := range req.signals {
 		signalIdx := sig.Index
@@ -57,12 +53,12 @@ func (s *Service) processResult(ctx context.Context, req processRunRequest) (pro
 		windowLen := barsForBuy + barsForSell
 		to := from.Add(time.Duration(windowLen) * time.Duration(minTF))
 
-		tradeWindow, err := s.fetchCandles(ctx, market.CandleSpec{Spec: req.market, Interval: minTF}, from, to, req.priceType)
+		tradeWindow, err := s.fetchCandles(ctx, req.market, minTF, from, to)
 		if err != nil {
 			return processRunResult{}, fmt.Errorf("process run result: fetch candles: %w", err)
 		}
 
-		resp, err := s.detectSvc.SignalStatus(detsvc.SignalStatusRequest{
+		resp, err := signalStatus(signalStatusRequest{
 			BarsForTrade: tradeWindow,
 			Signal:       sig.Signal,
 			BarsForBuy:   barsForBuy,
@@ -71,7 +67,7 @@ func (s *Service) processResult(ctx context.Context, req processRunRequest) (pro
 		})
 		if err != nil {
 			// если по сигналу не получилось купить — дроп
-			if errors.Is(err, detsvc.ErrNoBuy) || errors.Is(err, detsvc.ErrNoData) {
+			if errors.Is(err, ErrNoBuy) || errors.Is(err, ErrNoData) {
 				continue
 			}
 			return processRunResult{}, fmt.Errorf("process run result: signal status: %w", err)

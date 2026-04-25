@@ -6,15 +6,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/pulsoats/core/domain/detect"
-	"github.com/pulsoats/core/domain/market"
-)
-
-const (
-	StatusPending int = iota + 1
-	StatusRunning
-	StatusDone
-	StatusFailed
+	"github.com/google/uuid"
+	"github.com/pulsoats/core/market"
+	corerun "github.com/pulsoats/core/run"
 )
 
 type Filter int
@@ -26,25 +20,12 @@ const (
 	FilterAll
 )
 
-type Status struct {
-	Code    int
-	Message string
-}
-
-// Run описывает агрегированный результат прогонов исторического сервиса.
+// Run описывает агрегированный результат прогона исторического сервиса.
 type Run struct {
-	ID           int64
-	Status       Status
-	Market       market.Spec
-	Interval     market.Interval
-	PriceType    market.PriceType
-	Detector     detect.DetectorConfig
-	From         *time.Time
-	To           *time.Time
+	corerun.Base
+	Fees         market.TakerMakerFees
 	SignalsCount *int64
 	AvgProfitPPM *int64
-	CreatedBy    string
-	CreatedAt    time.Time
 	IsShared     bool
 	SharedAt     *time.Time
 }
@@ -52,18 +33,16 @@ type Run struct {
 func (r Run) String() string {
 	b, err := json.MarshalIndent(r, "", "  ")
 	if err != nil {
-		return fmt.Sprintf("Run{id=%d}", r.ID)
+		return fmt.Sprintf("Run{id=%s}", r.ID)
 	}
 	return string(b)
 }
 
 type Repository interface {
-	CreateRun(ctx context.Context, run *Run, status Status) error
-	UpdateStatus(ctx context.Context, runID int64, status Status) error
-	UpdateResult(ctx context.Context, res Run) error
-	StatusByRunID(ctx context.Context, runID int64) (Status, error)
-	RunByID(ctx context.Context, runID int64) (Run, error)
-	ListRunsPaged(ctx context.Context, limit int, beforeID *int64, callerID string, filter Filter) ([]Run, bool, *int64, error)
-	ShareRun(ctx context.Context, runID int64, callerID string) error
-	DeleteRun(ctx context.Context, runID int64) error
+	CreateRun(ctx context.Context, run *Run) error
+	UpdateRun(ctx context.Context, run Run) error
+	RunByID(ctx context.Context, runID uuid.UUID) (Run, error)
+	ListRunsPaged(ctx context.Context, limit int, beforeID *uuid.UUID, callerID string, filter Filter) ([]Run, bool, *uuid.UUID, error)
+	ShareRun(ctx context.Context, runID uuid.UUID, callerID string) error
+	DeleteRun(ctx context.Context, runID uuid.UUID) error
 }

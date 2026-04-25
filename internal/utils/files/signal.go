@@ -2,25 +2,27 @@ package files
 
 import (
 	"fmt"
+	"strings"
 
-	"github.com/pulsoats/core/domain/market"
+	"github.com/pulsoats/core/market"
 )
 
 type SignalsFileMeta struct {
 	Exchange string
-	Category market.Category
+	Category string
 	Interval market.Interval
 	Symbol   string
 	RunID    string
 }
 
 func SignalsFilename(m SignalsFileMeta) string {
-	return fmt.Sprintf(
-		"signals_%s_%s_%s_%s_%s.csv",
+	filename := strings.ToUpper(fmt.Sprintf(
+		"%s_%s_%s_%s",
 		m.Exchange,
 		m.Category,
 		m.Interval,
 		m.Symbol,
-		m.RunID,
-	)
+	))
+
+	return "signals_" + filename + "_" + m.RunID + ".csv"
 }

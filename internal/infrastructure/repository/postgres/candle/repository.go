@@ -1,4 +1,4 @@
-package candles
+package candle
 
 import (
 	"context"
@@ -8,20 +8,22 @@ import (
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/pulsoats/analysis/internal/domain"
-	"github.com/pulsoats/core/domain/market"
 	"github.com/pulsoats/core/errorsx"
+	"github.com/pulsoats/core/market"
 )
 
-type repo struct {
+type Repository struct {
 	pool *pgxpool.Pool
 }
 
-func NewRepository(pool *pgxpool.Pool) domain.CandleRepository {
-	return &repo{pool: pool}
+func NewRepository(pool *pgxpool.Pool) (*Repository, error) {
+	if pool == nil {
+		return nil, fmt.Errorf("candle repository: pool is nil")
+	}
+	return &Repository{pool: pool}, nil
 }
 
-func (r *repo) Upsert(ctx context.Context, spec market.CandleSpec, candles []market.Candle) error {
+func (r *Repository) Upsert(ctx context.Context, spec market.Spec, interval market.Interval, candles []market.Candle) error {
 	if len(candles) == 0 {
 		return nil
 	}
@@ -45,7 +47,7 @@ func (r *repo) Upsert(ctx context.Context, spec market.CandleSpec, candles []mar
 			spec.Exchange,
 			spec.Category,
 			spec.Symbol,
-			intervalSec(spec.Interval),
+			intervalSec(interval),
 			time.UnixMilli(c.Time).UTC(),
 			c.Open,
 			c.High,
@@ -53,14 +55,13 @@ func (r *repo) Upsert(ctx context.Context, spec market.CandleSpec, candles []mar
 			c.Close,
 			c.Volume,
 			c.Turnover,
-			c.PriceType,
 		})
 	}
 
 	cols := []string{
 		"exchange", "category", "symbol", "interval", "time",
 		"open_price", "high_price", "low_price", "close_price",
-		"volume", "turnover", "price_type",
+		"volume", "turnover",
 	}
 
 	_, err = tx.CopyFrom(
@@ -77,14 +78,14 @@ func (r *repo) Upsert(ctx context.Context, spec market.CandleSpec, candles []mar
 INSERT INTO analysis.candles (
   exchange, category, symbol, interval, time,
   open_price, high_price, low_price, close_price,
-  volume, turnover, price_type
+  volume, turnover
 )
 SELECT
   exchange, category, symbol, interval, time,
   open_price, high_price, low_price, close_price,
-  volume, turnover, price_type
+  volume, turnover
 FROM analysis.candles_staging
-ON CONFLICT (exchange, category, symbol, interval, time, price_type)
+ON CONFLICT (exchange, category, symbol, interval, time)
 DO NOTHING;
 `
 	if _, err := tx.Exec(ctx, mergeSQL); err != nil {
@@ -97,16 +98,15 @@ DO NOTHING;
 	return nil
 }
 
-func (r *repo) ListByTime(ctx context.Context, spec market.CandleSpec, from, to time.Time, priceType market.PriceType) ([]market.Candle, error) {
+func (r *Repository) ListByTime(ctx context.Context, spec market.Spec, interval market.Interval, from, to time.Time) ([]market.Candle, error) {
 	const query = `
-		SELECT time, open_price, high_price, low_price, close_price, volume, turnover, price_type
+		SELECT time, open_price, high_price, low_price, close_price, volume, turnover
 		FROM analysis.candles
 		WHERE exchange = $1
 		  AND category = $2
 		  AND symbol = $3
 		  AND interval = $4
 		  AND time >= $5 AND time < $6
-		  AND price_type = $7
 		ORDER BY time;
 	`
 
@@ -114,7 +114,7 @@ func (r *repo) ListByTime(ctx context.Context, spec market.CandleSpec, from, to 
 		return nil, fmt.Errorf("list by time: from > to: %w", errorsx.ErrInvalidArgument)
 	}
 
-	rows, err := r.pool.Query(ctx, query, spec.Exchange, spec.Category, spec.Symbol, intervalSec(spec.Interval), from, to, priceType)
+	rows, err := r.pool.Query(ctx, query, spec.Exchange, spec.Category, spec.Symbol, intervalSec(interval), from, to)
 	if err != nil {
 		return nil, fmt.Errorf("list by time: %w", errors.Join(errorsx.ErrInternal, err))
 	}
@@ -123,7 +123,7 @@ func (r *repo) ListByTime(ctx context.Context, spec market.CandleSpec, from, to 
 	candles, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (market.Candle, error) {
 		var c market.Candle
 		var ts time.Time
-		if err := row.Scan(&ts, &c.Open, &c.High, &c.Low, &c.Close, &c.Volume, &c.Turnover, &c.PriceType); err != nil {
+		if err := row.Scan(&ts, &c.Open, &c.High, &c.Low, &c.Close, &c.Volume, &c.Turnover); err != nil {
 			return market.Candle{}, fmt.Errorf("list by time: scan: %w", errors.Join(errorsx.ErrInternal, err))
 		}
 		c.Time = ts.UTC().UnixMilli()

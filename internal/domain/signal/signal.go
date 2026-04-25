@@ -1,7 +1,7 @@
-package domain
+package signal
 
 import (
-	"github.com/pulsoats/core/domain/detect"
+	"github.com/pulsoats/core/detect"
 )
 
 type AnalysisSignal struct {
