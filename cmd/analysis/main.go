@@ -16,7 +16,7 @@ import (
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres/candle"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres/runs"
 	"github.com/pulsoats/analysis/internal/transport/xgrpc/analysis"
-	"github.com/pulsoats/analysis/internal/transport/xgrpc/catalog"
+	xrgpccatalog "github.com/pulsoats/analysis/internal/transport/xgrpc/catalog"
 	xgrpchealth "github.com/pulsoats/analysis/internal/transport/xgrpc/health"
 	"github.com/rs/zerolog/log"
 
@@ -97,7 +97,7 @@ func main() {
 	if err != nil {
 		zlog.Fatal().Err(err)
 	}
-	catalogSrv, err := catalog.NewServer(detectorApp)
+	catalogSrv, err := xrgpccatalog.NewServer(detectorApp)
 	if err != nil {
 		zlog.Fatal().Err(err)
 	}
