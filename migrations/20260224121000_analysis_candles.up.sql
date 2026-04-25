@@ -11,8 +11,7 @@ CREATE TABLE IF NOT EXISTS analysis.candles
     close_price BIGINT           NOT NULL,
     volume      BIGINT           NOT NULL,
     turnover    DOUBLE PRECISION NOT NULL,
-    price_type  TEXT             NOT NULL,
-    PRIMARY KEY (exchange, category, symbol, interval, time, price_type)
+    PRIMARY KEY (exchange, category, symbol, interval, time)
 );
 
 CREATE TABLE IF NOT EXISTS analysis.candles_staging
@@ -27,8 +26,7 @@ CREATE TABLE IF NOT EXISTS analysis.candles_staging
     low_price   BIGINT           NOT NULL,
     close_price BIGINT           NOT NULL,
     volume      BIGINT           NOT NULL,
-    turnover    DOUBLE PRECISION NOT NULL,
-    price_type  TEXT             NOT NULL
+    turnover    DOUBLE PRECISION NOT NULL
 );
 
 SELECT create_hypertable('analysis.candles', 'time', if_not_exists => TRUE);

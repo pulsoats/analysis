@@ -2,7 +2,6 @@
 
 FROM golang:1.25.3 AS builder
 
-ARG GITHUB_TOKEN
 ENV GOPRIVATE=github.com/pulsoats/* \
     GONOSUMDB=github.com/pulsoats/* \
     GONOPROXY=github.com/pulsoats/*
@@ -12,9 +11,11 @@ WORKDIR /src
 COPY go.mod go.sum ./
 
 RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=secret,id=github_token \
     set -e; \
-    if [ -n "${GITHUB_TOKEN:-}" ]; then \
-        printf "machine github.com\nlogin %s\npassword x-oauth-basic\n" "$GITHUB_TOKEN" > /root/.netrc; \
+    if [ -f /run/secrets/github_token ]; then \
+        printf "machine github.com\nlogin %s\npassword x-oauth-basic\n" \
+            "$(cat /run/secrets/github_token)" > /root/.netrc; \
         chmod 600 /root/.netrc; \
     fi; \
     go mod download; \
@@ -24,13 +25,17 @@ COPY . .
 
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=secret,id=github_token \
     set -e; \
     mkdir -p /out; \
-    if [ -n "${GITHUB_TOKEN:-}" ]; then \
-        printf "machine github.com\nlogin %s\npassword x-oauth-basic\n" "$GITHUB_TOKEN" > /root/.netrc; \
+    if [ -f /run/secrets/github_token ]; then \
+        printf "machine github.com\nlogin %s\npassword x-oauth-basic\n" \
+            "$(cat /run/secrets/github_token)" > /root/.netrc; \
         chmod 600 /root/.netrc; \
     fi; \
-    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o /out/analysis-app ./cmd; \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+        -ldflags "-X main.version=$(git describe --tags --always --dirty)" \
+        -o /out/analysis-app ./cmd/analysis; \
     rm -f /root/.netrc
 
 FROM debian:bookworm-slim
@@ -47,10 +52,6 @@ WORKDIR /app
 
 COPY --from=builder /out/analysis-app /usr/local/bin/analysis-app
 
-ENV ANALYSIS_STORAGE_DIR=/data/runs \
-    ANALYSIS_GRPC_ADDR=:50051
-
-EXPOSE 50051
 VOLUME ["/data"]
 
 USER analysis
