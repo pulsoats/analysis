@@ -102,10 +102,10 @@ func main() {
 		zlog.Fatal().Err(err)
 	}
 
-	serviceID := uuid.New().String()
+	serviceID := uuid.New()
 	serviceName := os.Getenv(envServiceName)
 	if serviceName == "" {
-		serviceName = "analysis_" + serviceID
+		serviceName = "analysis_" + serviceID.String()
 	}
 
 	healthApp := apphealth.NewApplication(coresystem.ServiceInfo{

@@ -32,7 +32,7 @@ func NewServer(app app) (*Server, error) {
 func (s *Server) Info(_ context.Context, _ *emptypb.Empty) (*systempb.ServiceInfo, error) {
 	info := s.app.Info()
 	return &systempb.ServiceInfo{
-		Id:       info.ID,
+		Id:       info.ID.String(),
 		Kind:     systempb.ServiceKind_SERVICE_KIND_ANALYSIS,
 		Name:     info.Name,
 		Exchange: info.Exchange,
@@ -47,7 +47,7 @@ func (s *Server) Metrics(ctx context.Context, _ *emptypb.Empty) (*systempb.Servi
 		return nil, status.Errorf(codes.Internal, "collect metrics: %v", err)
 	}
 	return &systempb.ServiceMetrics{
-		ServiceId:     m.ServiceID,
+		ServiceId:     m.ServiceID.String(),
 		Status:        systempb.ServiceStatus(m.Status),
 		CpuPercent:    m.CpuPercent,
 		MemoryPercent: m.MemoryPercent,
