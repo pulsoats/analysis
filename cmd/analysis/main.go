@@ -10,21 +10,21 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pulsoats/analysis/internal/application/catalog"
-	apphealth "github.com/pulsoats/analysis/internal/application/health"
 	apprun "github.com/pulsoats/analysis/internal/application/run"
+	apphealth "github.com/pulsoats/analysis/internal/application/system"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres/candle"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres/runs"
 	"github.com/pulsoats/analysis/internal/transport/xgrpc/analysis"
 	xrgpccatalog "github.com/pulsoats/analysis/internal/transport/xgrpc/catalog"
-	xgrpchealth "github.com/pulsoats/analysis/internal/transport/xgrpc/health"
+	xgrpchealth "github.com/pulsoats/analysis/internal/transport/xgrpc/system"
 	"github.com/rs/zerolog/log"
 
 	"github.com/pulsoats/analysis/internal/logger"
 	"github.com/pulsoats/analysis/internal/transport/xgrpc"
 	"github.com/pulsoats/core/detect/detectors"
 	"github.com/pulsoats/core/exchanges"
-	coreheath "github.com/pulsoats/core/health"
+	coresystem "github.com/pulsoats/core/system"
 )
 
 const (
@@ -108,8 +108,9 @@ func main() {
 		serviceName = "analysis_" + serviceID
 	}
 
-	healthApp := apphealth.NewApplication(coreheath.ServiceInfo{
+	healthApp := apphealth.NewApplication(coresystem.ServiceInfo{
 		ID:       serviceID,
+		Kind:     coresystem.ServiceKindAnalysis,
 		Name:     serviceName,
 		Exchange: "",
 		Account:  "analysis",

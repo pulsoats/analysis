@@ -1,10 +1,10 @@
-package health
+package system
 
 import (
 	"context"
 	"time"
 
-	"github.com/pulsoats/core/health"
+	"github.com/pulsoats/core/system"
 	"github.com/shirou/gopsutil/v4/cpu"
 	"github.com/shirou/gopsutil/v4/mem"
 )
@@ -14,12 +14,12 @@ type pinger interface {
 }
 
 type Application struct {
-	info      health.ServiceInfo
+	info      system.ServiceInfo
 	db        pinger
 	startedAt time.Time
 }
 
-func NewApplication(info health.ServiceInfo, db pinger) *Application {
+func NewApplication(info system.ServiceInfo, db pinger) *Application {
 	return &Application{
 		info:      info,
 		db:        db,
@@ -27,16 +27,16 @@ func NewApplication(info health.ServiceInfo, db pinger) *Application {
 	}
 }
 
-func (a *Application) Info() health.ServiceInfo {
+func (a *Application) Info() system.ServiceInfo {
 	return a.info
 }
 
-func (a *Application) Metrics(ctx context.Context) (health.ServiceMetrics, error) {
+func (a *Application) Metrics(ctx context.Context) (system.ServiceMetrics, error) {
 	now := time.Now()
 
-	status := health.ServiceStatus(health.ServiceStatusHealthy)
+	status := system.ServiceStatusHealthy
 	if err := a.db.Ping(ctx); err != nil {
-		status = health.ServiceStatus(health.ServiceStatusDegraded)
+		status = system.ServiceStatusDegraded
 	}
 
 	var memPercent float64
@@ -49,7 +49,7 @@ func (a *Application) Metrics(ctx context.Context) (health.ServiceMetrics, error
 		cpuPercent = percents[0]
 	}
 
-	return health.ServiceMetrics{
+	return system.ServiceMetrics{
 		ServiceID:     a.info.ID,
 		Status:        status,
 		CpuPercent:    cpuPercent,

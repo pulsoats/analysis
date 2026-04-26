@@ -9,12 +9,12 @@ import (
 	"github.com/pulsoats/analysis/internal/transport/xgrpc/interceptor"
 	analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
 	catalogpb "github.com/pulsoats/contracts/gen/go/catalog/v1"
-	healthpb "github.com/pulsoats/contracts/gen/go/health/v1"
+	systempb "github.com/pulsoats/contracts/gen/go/system/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
-func RunGRPCServer(ctx context.Context, addr string, analysisSrv analysispb.AnalysisServer, catalogSrv catalogpb.CatalogServer, healthSrv healthpb.ServiceMonitorServer, log *slog.Logger, secret string) error {
+func RunGRPCServer(ctx context.Context, addr string, analysisSrv analysispb.AnalysisServer, catalogSrv catalogpb.CatalogServer, ServiceMonitorSrv systempb.ServiceMonitorServer, log *slog.Logger, secret string) error {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -40,7 +40,7 @@ func RunGRPCServer(ctx context.Context, addr string, analysisSrv analysispb.Anal
 
 	analysispb.RegisterAnalysisServer(server, analysisSrv)
 	catalogpb.RegisterCatalogServer(server, catalogSrv)
-	healthpb.RegisterServiceMonitorServer(server, healthSrv)
+	systempb.RegisterServiceMonitorServer(server, ServiceMonitorSrv)
 
 	if ctx != nil {
 		go func() {

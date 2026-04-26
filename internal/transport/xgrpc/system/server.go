@@ -1,11 +1,11 @@
-package health
+package system
 
 import (
 	"context"
 	"errors"
 
-	healthpb "github.com/pulsoats/contracts/gen/go/health/v1"
-	coreheath "github.com/pulsoats/core/health"
+	systempb "github.com/pulsoats/contracts/gen/go/system/v1"
+	coresystem "github.com/pulsoats/core/system"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -13,12 +13,12 @@ import (
 )
 
 type app interface {
-	Info() coreheath.ServiceInfo
-	Metrics(ctx context.Context) (coreheath.ServiceMetrics, error)
+	Info() coresystem.ServiceInfo
+	Metrics(ctx context.Context) (coresystem.ServiceMetrics, error)
 }
 
 type Server struct {
-	healthpb.UnimplementedServiceMonitorServer
+	systempb.UnimplementedServiceMonitorServer
 	app app
 }
 
@@ -29,10 +29,11 @@ func NewServer(app app) (*Server, error) {
 	return &Server{app: app}, nil
 }
 
-func (s *Server) Info(_ context.Context, _ *emptypb.Empty) (*healthpb.ServiceInfo, error) {
+func (s *Server) Info(_ context.Context, _ *emptypb.Empty) (*systempb.ServiceInfo, error) {
 	info := s.app.Info()
-	return &healthpb.ServiceInfo{
+	return &systempb.ServiceInfo{
 		Id:       info.ID,
+		Kind:     systempb.ServiceKind_SERVICE_KIND_ANALYSIS,
 		Name:     info.Name,
 		Exchange: info.Exchange,
 		Account:  info.Account,
@@ -40,14 +41,14 @@ func (s *Server) Info(_ context.Context, _ *emptypb.Empty) (*healthpb.ServiceInf
 	}, nil
 }
 
-func (s *Server) Metrics(ctx context.Context, _ *emptypb.Empty) (*healthpb.ServiceMetrics, error) {
+func (s *Server) Metrics(ctx context.Context, _ *emptypb.Empty) (*systempb.ServiceMetrics, error) {
 	m, err := s.app.Metrics(ctx)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "collect metrics: %v", err)
 	}
-	return &healthpb.ServiceMetrics{
+	return &systempb.ServiceMetrics{
 		ServiceId:     m.ServiceID,
-		Status:        healthpb.ServiceStatus(m.Status),
+		Status:        systempb.ServiceStatus(m.Status),
 		CpuPercent:    m.CpuPercent,
 		MemoryPercent: m.MemoryPercent,
 		UptimeSeconds: m.UptimeSeconds,
