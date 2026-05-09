@@ -4,18 +4,27 @@ services:
       context: .
       secrets:
         - github_token
+    container_name: pulsoats-analysis
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate-analysis:
+        condition: service_completed_successfully
     env_file:
       - path: .env
         required: false
-    ports:
-      - "${GRPC_PORT:-50051}:${GRPC_PORT:-50051}"
+    environment:
+      GRPC_TLS_DISABLE: "true"
+      LOG_FORMAT: json
     volumes:
-      - analysis_data:/data
-    restart: unless-stopped
+      - analysis-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "grpc_health_probe -addr=:50051 2>/dev/null || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
-  analysis_data:
-
-secrets:
-  github_token:
-    environment: GITHUB_TOKEN
+  analysis-data:
