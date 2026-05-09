@@ -5,35 +5,16 @@ services:
       secrets:
         - github_token
     env_file:
-      - .env
+      - path: .env
+        required: false
     ports:
       - "${GRPC_PORT:-50051}:${GRPC_PORT:-50051}"
     volumes:
       - analysis_data:/data
-#    depends_on:
-#      postgres:
-#        condition: service_healthy
     restart: unless-stopped
-
-#  postgres:
-#    image: postgres:17-alpine
-#    environment:
-#      POSTGRES_USER: analysis
-#      POSTGRES_PASSWORD: analysis
-#      POSTGRES_DB: analysis
-#    ports:
-#      - "5432:5432"
-#    volumes:
-#      - postgres_data:/var/lib/postgresql/data
-#    healthcheck:
-#      test: ["CMD-SHELL", "pg_isready -U analysis -d analysis"]
-#      interval: 5s
-#      timeout: 5s
-#      retries: 5
 
 volumes:
   analysis_data:
-#  postgres_data:
 
 secrets:
   github_token:

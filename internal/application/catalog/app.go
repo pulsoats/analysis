@@ -14,11 +14,15 @@ type Application struct {
 	exchanges map[string]exchange.PublicClient
 }
 
-func NewApplication(detectorsRegistry *detectors.Registry) (*Application, error) {
+func NewApplication(detectorsRegistry *detectors.Registry, exchanges map[string]exchange.PublicClient) (*Application, error) {
 	if detectorsRegistry == nil {
 		return nil, fmt.Errorf("detectors app: detectors registry is nil")
 	}
-	return &Application{detReg: detectorsRegistry}, nil
+
+	return &Application{
+		detReg:    detectorsRegistry,
+		exchanges: exchanges,
+	}, nil
 }
 
 // ListAvailableDetectors возвращает слайс метаданных по каждому из встроенных детекторов.

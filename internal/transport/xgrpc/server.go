@@ -2,6 +2,7 @@ package xgrpc
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"log/slog"
 	"net"
@@ -11,36 +12,56 @@ import (
 	catalogpb "github.com/pulsoats/contracts/gen/go/catalog/v1"
 	systempb "github.com/pulsoats/contracts/gen/go/system/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/reflection"
 )
 
-func RunGRPCServer(ctx context.Context, addr string, analysisSrv analysispb.AnalysisServer, catalogSrv catalogpb.CatalogServer, ServiceMonitorSrv systempb.ServiceMonitorServer, log *slog.Logger, secret string) error {
-	if log == nil {
+type Config struct {
+	Addr                 string
+	AnalysisServer       analysispb.AnalysisServer
+	CatalogServer        catalogpb.CatalogServer
+	ServiceMonitorServer systempb.ServiceMonitorServer
+	Logger               *slog.Logger
+	TLSConfig            *tls.Config
+}
+
+func RunGRPCServer(ctx context.Context, cfg Config) error {
+	if cfg.AnalysisServer == nil {
+		return errors.New("grpc: analysis server is nil")
+	}
+	if cfg.CatalogServer == nil {
+		return errors.New("grpc: analysis server is nil")
+	}
+	log := cfg.Logger
+	if cfg.Logger == nil {
 		log = slog.Default()
 	}
 	log = log.With("component", "grpc.server")
 
-	lis, err := net.Listen("tcp", addr)
+	lis, err := net.Listen("tcp", cfg.Addr)
 	if err != nil {
 		return err
 	}
 
-	server := grpc.NewServer(
+	var serverOpts []grpc.ServerOption
+	if cfg.TLSConfig != nil {
+		serverOpts = append(serverOpts, grpc.Creds(credentials.NewTLS(cfg.TLSConfig)))
+	}
+	serverOpts = append(serverOpts,
 		grpc.ChainUnaryInterceptor(
-			interceptor.ServiceTokenUnaryInterceptor(secret),
 			interceptor.UserIDInterceptor(),
 			interceptor.UnaryLogger(log),
 			interceptor.UnaryError(log),
 		),
 		grpc.ChainStreamInterceptor(
-			interceptor.ServiceTokenStreamInterceptor(secret),
 			interceptor.StreamError(log)),
 	)
+	server := grpc.NewServer(serverOpts...)
 	reflection.Register(server)
 
-	analysispb.RegisterAnalysisServer(server, analysisSrv)
-	catalogpb.RegisterCatalogServer(server, catalogSrv)
-	systempb.RegisterServiceMonitorServer(server, ServiceMonitorSrv)
+	analysispb.RegisterAnalysisServer(server, cfg.AnalysisServer)
+	catalogpb.RegisterCatalogServer(server, cfg.CatalogServer)
+	systempb.RegisterServiceMonitorServer(server, cfg.ServiceMonitorServer)
 
 	if ctx != nil {
 		go func() {

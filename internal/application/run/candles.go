@@ -34,7 +34,7 @@ func (s *Application) fetchCandles(ctx context.Context, spec market.Spec, interv
 	return v.([]market.Candle), nil
 }
 
-func (s *Application) loadCandlesRange(ctx context.Context, api exchange.Client, spec market.Spec, interval market.Interval, from time.Time, to time.Time) ([]market.Candle, error) {
+func (s *Application) loadCandlesRange(ctx context.Context, api exchange.PublicClient, spec market.Spec, interval market.Interval, from time.Time, to time.Time) ([]market.Candle, error) {
 	from = from.UTC()
 	to = to.UTC()
 	reqFrom := from.UnixMilli()

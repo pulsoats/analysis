@@ -24,7 +24,7 @@ import (
 type Config struct {
 	RunRepository     run.Repository
 	CandleRepository  candle.Repository
-	Exchanges         map[string]exchange.Client
+	Exchanges         map[string]exchange.PublicClient
 	DetectorsRegistry *detectors.Registry
 	StorageDir        string
 	Logger            *slog.Logger
@@ -34,7 +34,7 @@ type Config struct {
 type Application struct {
 	runRepo     run.Repository
 	candleRepo  candle.Repository
-	exchanges   map[string]exchange.Client
+	exchanges   map[string]exchange.PublicClient
 	detRegistry *detectors.Registry
 	storageDir  string
 	log         *slog.Logger

@@ -1,50 +1,123 @@
-# Analysis app
+# Analysis
 
-Сервис бэктестинга детекторов теханализа из `pulsoats/core`. Он поднимает gRPC API для запуска исторических прогонов, хранит метаданные и кэш свечей в PostgreSQL и собирает результат каждого прогона в ZIP-архив.
+Сервис исторического анализа торговых сигналов для `pulsoats`. Поднимает gRPC API, запускает бэктесты детекторов из `github.com/pulsoats/core`, хранит метаданные прогонов и кэш свечей в PostgreSQL/TimescaleDB, а результат каждого завершенного прогона сохраняет ZIP-архивом.
 
-## Ключевые возможности
-- создание нового прогона через `NewRun`;
-- получение метаданных прогона через `GetRun`;
-- постраничный список прогонов через `ListRunsPaged`;
-- публикация и удаление прогонов через `ShareRun` и `DeleteRun`;
-- потоковая выгрузка готового архива через `GetRunArchive`;
-- выдача каталога доступных детекторов и бирж через `Catalog/ListAvailableDetectors` и `Catalog/ListAvailableExchanges`;
-- health-monitoring через `ServiceMonitor/Info` и `ServiceMonitor/Metrics`;
-- кэширование исторических свечей в PostgreSQL для повторного использования.
+## Что делает сервис
 
-## Поток обработки
-1. Клиент вызывает `Analysis/NewRun`, передаёт конфиг прогона и заголовок `x-user-id`.
-2. `internal/transport/xgrpc/analysis` мапит protobuf в `internal/domain/run.NewRunRequest`.
-3. `internal/application/run.Application` валидирует запрос, создаёт запись в `analysis.runs` со статусом `pending` и запускает вычисление в фоне.
-4. Во время вычисления сервис:
-   - получает свечи через зарегистрированные exchange clients из `pulsoats/core/exchanges`, сначала проверяя кэш `analysis.candles`;
-   - строит candle-detector через `pulsoats/core/detect/detectors`;
-   - ищет сигналы на исходном таймфрейме и затем пересчитывает их результат на `1m` свечах;
-   - сохраняет агрегированную статистику прогона;
-   - собирает ZIP-архив с CSV/JSON артефактами в каталоге `RUNS_STORAGE_DIR`.
-5. Финальный статус прогона обновляется в БД как `done` или `failed`.
+- принимает запрос на новый прогон через `Analysis/NewRun`;
+- валидирует рынок, период, интервал, детектор и параметры комиссий;
+- получает исторические свечи из exchange clients `pulsoats/core/exchanges`;
+- кэширует свечи в таблице `analysis.candles`;
+- запускает candle-detector из registry `pulsoats/core/detect/detectors`;
+- пересчитывает результат сигналов на минимальном таймфрейме `1m`;
+- сохраняет статус, количество сигналов и среднюю доходность в `analysis.runs`;
+- собирает ZIP-архив с CSV/JSON артефактами;
+- отдает метаданные прогонов, список прогонов, публикацию, удаление и stream архива по gRPC;
+- отдает служебную информацию и runtime metrics через `ServiceMonitor`.
 
-## Архитектура
-- `cmd/analysis/main.go` — точка входа, wiring приложения, инициализация PostgreSQL, registry детекторов и gRPC server.
-- `internal/application/run` — основной application layer для жизненного цикла прогона.
-- `internal/application/catalog` — выдача списка встроенных детекторов и доступных бирж.
-- `internal/application/health` — service info и runtime metrics.
-- `internal/infrastructure/repository/postgres` — репозитории прогонов, свечей, tx manager и pool.
-- `internal/transport/xgrpc` — gRPC transport, registration сервисов и interceptors.
-- `internal/utils/files` — генерация CSV/ZIP артефактов прогона.
+## Поток выполнения прогона
+
+1. Клиент вызывает `pulsoats.analysis.v1.Analysis/NewRun` и передает metadata `x-user-id`.
+2. gRPC transport мапит protobuf request в `internal/domain/run.NewRunRequest`.
+3. `internal/application/run.Application` создает запись в `analysis.runs` со статусом `pending`.
+4. Прогон запускается в фоне:
+   - статус меняется на `running`;
+   - свечи читаются из кэша PostgreSQL или догружаются с биржи;
+   - детектор ищет сигналы на исходном интервале;
+   - для найденных сигналов результат сделки считается на `1m` свечах;
+   - строится ZIP-архив `run_<uuid>.zip` в `RUNS_STORAGE_DIR`;
+   - статус меняется на `done` или `failed`.
+5. Клиент может получить метаданные через `GetRun` и архив через streaming-метод `GetRunArchive`.
+
+## Структура проекта
+
+```text
+cmd/analysis/             точка входа, wiring зависимостей и запуск gRPC
+internal/application/     application layer: run, catalog, system
+internal/domain/          доменные модели и интерфейсы репозиториев
+internal/infrastructure/  PostgreSQL pool, tx manager и репозитории
+internal/transport/xgrpc/ gRPC servers, mappers и interceptors
+internal/utils/files/     генерация CSV/JSON/ZIP артефактов
+migrations/               SQL-миграции схемы analysis
+```
 
 ## Конфигурация
-- `POSTGRES_DSN` — обязательный DSN подключения к PostgreSQL.
-- `RUNS_STORAGE_DIR` — каталог для ZIP-архивов прогонов. По умолчанию `data/runs`.
-- `GRPC_HOST` — host для gRPC сервера. По умолчанию `0.0.0.0`.
-- `GRPC_PORT` — port для gRPC сервера. По умолчанию `50051`.
-- `SERVICE_SECRET_TOKEN` — обязательный service-to-service токен. Проверяется по metadata `x-service-token` для всех gRPC вызовов.
-- `SERVICE_NAME` — имя сервиса для health endpoint. По умолчанию генерируется как `analysis_<uuid>`.
+
+Основные переменные окружения:
+
+| Переменная | Описание | Значение по умолчанию |
+| --- | --- | --- |
+| `POSTGRES_DSN` | DSN подключения к PostgreSQL/TimescaleDB | обязательна |
+| `RUNS_STORAGE_DIR` | каталог ZIP-архивов прогонов | `data/runs` |
+| `GRPC_HOST` | host gRPC сервера | `0.0.0.0` |
+| `GRPC_PORT` | port gRPC сервера | `50051` |
+| `GRPC_TLS_CERT_FILE` | server certificate для gRPC TLS/mTLS | нет |
+| `GRPC_TLS_KEY_FILE` | private key для gRPC TLS/mTLS | нет |
+| `GRPC_TLS_CA_FILE` | CA certificate для проверки клиентов | нет |
+| `GRPC_TLS_DISABLE` | локальная опция отключения TLS | `false` |
+| `SERVICE_ID` | UUID сервиса в `ServiceMonitor/Info` | генерируется при старте |
+| `SERVICE_NAME` | имя сервиса в `ServiceMonitor/Info` | `analysis_<uuid>` |
+| `LOG_LEVEL` | уровень логирования: `debug`, `info`, `warn`, `error` | `info` |
+| `LOG_FORMAT` | формат логов: `json` или `console` | `console` |
+
+Пример локального файла окружения лежит в `.env.example`.
+
+Для локальной разработки можно выставить `GRPC_TLS_DISABLE=true`, тогда gRPC сервер стартует без TLS credentials. Для production-запуска с TLS нужно передать пути к certificate, key и CA через `GRPC_TLS_CERT_FILE`, `GRPC_TLS_KEY_FILE` и `GRPC_TLS_CA_FILE`.
+
+## Docker Compose
+
+`docker-compose.yml` поднимает только Go-сервис `analysis`. Внешняя инфраструктура, включая PostgreSQL, миграции и выпуск TLS-сертификатов, в compose не описана.
+
+Для сборки Docker image используется BuildKit secret `github_token`, потому что зависимости `github.com/pulsoats/*` помечены как private через `GOPRIVATE`.
+
+Перед запуском нужны значения в `.env`:
+
+```env
+POSTGRES_DSN=postgres://user:password@host:5432/db?sslmode=disable
+GRPC_PORT=50051
+GRPC_TLS_DISABLE=true
+```
+
+Запуск:
+
+```bash
+GITHUB_TOKEN=... docker compose up --build
+```
+
+Сервис ожидает внешний PostgreSQL/TimescaleDB по `POSTGRES_DSN`.
+
+## Миграции и данные
+
+Миграции лежат в `migrations/` и создают:
+
+- расширение `timescaledb`;
+- схему `analysis`;
+- hypertable `analysis.candles` для кэша свечей;
+- таблицу `analysis.candles_staging`;
+- таблицу `analysis.runs` для метаданных прогонов.
+
+Ключевые поля `analysis.runs`:
+
+- `id` — UUID прогона;
+- `status_code`, `status_message` — статус выполнения;
+- `exchange`, `category`, `symbol`, `interval` — рынок и таймфрейм;
+- `detector_code`, `detector_label`, `detector_opts` — конфигурация детектора;
+- `first_candle_time`, `last_candle_time` — фактические границы свечей;
+- `signals_count`, `avg_profit_ppm` — агрегированный результат;
+- `created_by`, `is_shared`, `shared_at` — владелец и публикация.
+
+Primary key `analysis.candles`:
+
+```text
+(exchange, category, symbol, interval, time)
+```
 
 ## gRPC API
-Контракты лежат в `github.com/pulsoats/contracts`.
 
-Сервис `analysis.v1.Analysis` реализует методы:
+Контракты подключаются из `github.com/pulsoats/contracts`.
+
+`pulsoats.analysis.v1.Analysis`:
+
 - `NewRun`
 - `GetRun`
 - `ListRunsPaged`
@@ -52,42 +125,49 @@
 - `ShareRun`
 - `DeleteRun`
 
-Сервис `catalog.v1.Catalog` реализует:
+`pulsoats.catalog.v1.Catalog`:
+
 - `ListAvailableDetectors`
 - `ListAvailableExchanges`
 
-Сервис `health.v1.ServiceMonitor` реализует:
+`pulsoats.system.v1.ServiceMonitor`:
+
 - `Info`
 - `Metrics`
 
-### Аутентификация и metadata
-- Для всех gRPC вызовов обязателен metadata header `x-service-token`.
-- Для методов `NewRun`, `ListRunsPaged`, `ShareRun`, `DeleteRun` обязателен metadata header `x-user-id`.
+### Metadata
 
-### Идентификаторы
-- Идентификатор прогона — `UUID`.
-- Пагинация `ListRunsPaged` использует `before_id` тоже в формате `UUID`.
+Для пользовательских unary-методов обязателен metadata header:
 
-## Данные и миграции
-Миграции лежат в каталоге `migrations/`.
-
-Текущая схема включает:
-- `analysis.runs` — метаданные прогонов, статус, статистика, признак публикации;
-- `analysis.candles` — кэш исторических свечей.
-
-Актуальные особенности схемы:
-- `analysis.runs.id` имеет тип `UUID`;
-- в `analysis.runs` используются поля `first_candle_time` и `last_candle_time`;
-- primary key таблицы `analysis.candles` строится по `(exchange, category, symbol, interval, time)`.
-
-## Структура репозитория
 ```text
-cmd/analysis/           входной бинарь
-internal/application/   application layer
-internal/domain/        доменные модели и интерфейсы
-internal/infrastructure/доступ к PostgreSQL
-internal/transport/xgrpc/ gRPC transport и interceptors
-internal/utils/files/   генерация CSV/ZIP
-migrations/             SQL-миграции
-data/                   локальные артефакты прогонов
+x-user-id: <user-id>
+```
+
+Он требуется для:
+
+- `Analysis/NewRun`
+- `Analysis/ListRunsPaged`
+- `Analysis/ShareRun`
+- `Analysis/DeleteRun`
+
+`GetRun`, `GetRunArchive`, `Catalog/*` и `ServiceMonitor/*` не требуют `x-user-id` на уровне текущего interceptor.
+
+Старый interceptor service token в текущем коде отсутствует, поэтому `x-service-token` сейчас не проверяется.
+
+## Локальная разработка
+
+Минимальные требования:
+
+- Go `1.25.3`;
+- PostgreSQL с TimescaleDB;
+- примененные SQL-миграции из `migrations/`;
+- доступ к private Go modules `github.com/pulsoats/*`;
+- TLS сертификаты для gRPC или `GRPC_TLS_DISABLE=true` для локального запуска.
+
+Полезные команды:
+
+```bash
+go test ./...
+go run ./cmd/analysis
+docker compose up --build
 ```

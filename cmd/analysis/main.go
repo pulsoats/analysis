@@ -6,18 +6,19 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strconv"
 	"syscall"
 
 	"github.com/google/uuid"
 	"github.com/pulsoats/analysis/internal/application/catalog"
 	apprun "github.com/pulsoats/analysis/internal/application/run"
-	apphealth "github.com/pulsoats/analysis/internal/application/system"
+	appsystem "github.com/pulsoats/analysis/internal/application/system"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres/candle"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres/runs"
 	"github.com/pulsoats/analysis/internal/transport/xgrpc/analysis"
 	xrgpccatalog "github.com/pulsoats/analysis/internal/transport/xgrpc/catalog"
-	xgrpchealth "github.com/pulsoats/analysis/internal/transport/xgrpc/system"
+	xgrpcsystem "github.com/pulsoats/analysis/internal/transport/xgrpc/system"
 	"github.com/rs/zerolog/log"
 
 	"github.com/pulsoats/analysis/internal/logger"
@@ -25,15 +26,20 @@ import (
 	"github.com/pulsoats/core/detect/detectors"
 	"github.com/pulsoats/core/exchanges"
 	coresystem "github.com/pulsoats/core/system"
+	"github.com/pulsoats/core/tlsconfig"
 )
 
 const (
-	envPostgresDSN        = "POSTGRES_DSN"
-	envRunsStorageDir     = "RUNS_STORAGE_DIR"
-	envGRPCHost           = "GRPC_HOST"
-	envGRPCPort           = "GRPC_PORT"
-	envServiceSecretToken = "SERVICE_SECRET_TOKEN"
-	envServiceName        = "SERVICE_NAME"
+	envPostgresDSN    = "POSTGRES_DSN"
+	envRunsStorageDir = "RUNS_STORAGE_DIR"
+	envServiceID      = "SERVICE_ID"
+	envServiceName    = "SERVICE_NAME"
+	envGRPCHost       = "GRPC_HOST"
+	envGRPCPort       = "GRPC_PORT"
+	envTLSDisable     = "GRPC_TLS_DISABLE"
+	envTLSCertFile    = "GRPC_TLS_CERT_FILE"
+	envTLSKeyFile     = "GRPC_TLS_KEY_FILE"
+	envTLSCAFile      = "GRPC_TLS_CA_FILE"
 )
 
 var version = "dev"
@@ -73,7 +79,7 @@ func main() {
 		storageDir = filepath.Join("data", "runs")
 	}
 
-	cfg := apprun.Config{
+	appRunCfg := apprun.Config{
 		RunRepository:     runRepo,
 		CandleRepository:  candleRepo,
 		Exchanges:         exchangeAPIs,
@@ -83,7 +89,7 @@ func main() {
 		TxManager:         txManager,
 	}
 
-	runApp, err := apprun.NewApplication(cfg)
+	runApp, err := apprun.NewApplication(appRunCfg)
 	if err != nil {
 		zlog.Fatal().Err(err)
 	}
@@ -93,7 +99,7 @@ func main() {
 		zlog.Fatal().Err(err)
 	}
 
-	detectorApp, err := catalog.NewApplication(detectorRegistry)
+	detectorApp, err := catalog.NewApplication(detectorRegistry, exchangeAPIs)
 	if err != nil {
 		zlog.Fatal().Err(err)
 	}
@@ -103,12 +109,18 @@ func main() {
 	}
 
 	serviceID := uuid.New()
+	if rawServiceID := os.Getenv(envServiceID); rawServiceID != "" {
+		serviceID, err = uuid.Parse(rawServiceID)
+		if err != nil {
+			zlog.Fatal().Err(err).Str("service_id", rawServiceID).Msg("parse service id")
+		}
+	}
 	serviceName := os.Getenv(envServiceName)
 	if serviceName == "" {
 		serviceName = "analysis_" + serviceID.String()
 	}
 
-	healthApp := apphealth.NewApplication(coresystem.ServiceInfo{
+	systemApp := appsystem.NewApplication(coresystem.ServiceInfo{
 		ID:       serviceID,
 		Kind:     coresystem.ServiceKindAnalysis,
 		Name:     serviceName,
@@ -116,9 +128,9 @@ func main() {
 		Account:  "analysis",
 		Version:  version,
 	}, pool)
-	healthSrv, err := xgrpchealth.NewServer(healthApp)
+	serviceMonitorSrv, err := xgrpcsystem.NewServer(systemApp)
 	if err != nil {
-		zlog.Fatal().Err(err).Msg("init health server")
+		zlog.Fatal().Err(err).Msg("init service monitor server")
 	}
 
 	host := os.Getenv(envGRPCHost)
@@ -131,13 +143,31 @@ func main() {
 	}
 	addr := net.JoinHostPort(host, port)
 
-	secret := os.Getenv(envServiceSecretToken)
-	if secret == "" {
-		zlog.Fatal().Msg("SERVICE_SECRET_TOKEN is empty")
+	tlsDisable, _ := strconv.ParseBool(os.Getenv(envTLSDisable))
+
+	serverCfg := xgrpc.Config{
+		Addr:                 addr,
+		AnalysisServer:       analysisSrv,
+		CatalogServer:        catalogSrv,
+		ServiceMonitorServer: serviceMonitorSrv,
+		Logger:               slogLogger,
+	}
+	if tlsDisable {
+		zlog.Warn().Msg("TLS disabled — insecure mode")
+	} else {
+		tlsProvider, err := tlsconfig.New(
+			os.Getenv(envTLSCertFile),
+			os.Getenv(envTLSKeyFile),
+			os.Getenv(envTLSCAFile),
+		)
+		if err != nil {
+			zlog.Fatal().Err(err).Msg("init tls provider")
+		}
+		serverCfg.TLSConfig = tlsProvider.ServerConfig()
 	}
 
-	log.Info().Str("addr", addr).Msg("starting gRPC server")
-	if err := xgrpc.RunGRPCServer(ctx, addr, analysisSrv, catalogSrv, healthSrv, slogLogger, secret); err != nil {
+	zlog.Info().Str("addr", addr).Bool("tls", !tlsDisable).Msg("starting gRPC server")
+	if err := xgrpc.RunGRPCServer(ctx, serverCfg); err != nil {
 		zlog.Fatal().Err(err).Msg("gRPC server stopped with error")
 	}
 
