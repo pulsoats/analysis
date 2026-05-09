@@ -40,11 +40,8 @@ github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55 h1:o4JXh1EVt
 github.com/power-devops/perfstat v0.0.0-20240221224432-82ca36839d55/go.mod h1:OmDBASR4679mdNQnz2pUhc2G8CO2JrUAVFDRBDP/hJE=
 github.com/pulsoats/contracts v1.10.0 h1:DqzUbfv5emQYFi2oa/UuUDRG4CgTt6MITrkDMpbJMXQ=
 github.com/pulsoats/contracts v1.10.0/go.mod h1:tALJFOoAijHLIKzqkTYDbVEou0fmUqfUWSsvxGS1XOU=
-github.com/pulsoats/core v1.11.0 h1:G9f+uptn/X5TLEega5M1sWn9J1A6W6sSEYkOx/uW7QI=
-github.com/pulsoats/core v1.11.0/go.mod h1:6yUNEmr/1UyDDIKzeTo/80BjTYUdD3YK2OJK8hMGG5g=
-github.com/pulsoats/core v1.11.1 h1:+V0OnHlnLwNz19+zwTX+gCcSkee7PnOE40NPhD/htXE=
-github.com/pulsoats/core v1.11.1/go.mod h1:6yUNEmr/1UyDDIKzeTo/80BjTYUdD3YK2OJK8hMGG5g=
-github.com/pulsoats/core v1.11.2/go.mod h1:6yUNEmr/1UyDDIKzeTo/80BjTYUdD3YK2OJK8hMGG5g=
+github.com/pulsoats/core v1.11.3 h1:OOBOYOVnQRJputqFbBsTPmchWrvIe7x5aQYW7vZpVk4=
+github.com/pulsoats/core v1.11.3/go.mod h1:6yUNEmr/1UyDDIKzeTo/80BjTYUdD3YK2OJK8hMGG5g=
 github.com/rs/zerolog v1.35.1 h1:m7xQeoiLIiV0BCEY4Hs+j2NG4Gp2o2KPKmhnnLiazKI=
 github.com/rs/zerolog v1.35.1/go.mod h1:EjML9kdfa/RMA7h/6z6pYmq1ykOuA8/mjWaEvGI+jcw=
 github.com/shirou/gopsutil/v4 v4.26.3 h1:2ESdQt90yU3oXF/CdOlRCJxrP+Am1aBYubTMTfxJ1qc=
