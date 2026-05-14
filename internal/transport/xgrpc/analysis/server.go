@@ -51,7 +51,7 @@ func (s *Server) NewRun(ctx context.Context, req *analysispb.NewRunRequest) (*an
 		return nil, status.Error(codes.Internal, "missing user-id in ctx")
 	}
 
-	runCfg, err := mapToNewRunRequest(req)
+	runCfg, err := newRunFromRequestPb(req)
 	if err != nil {
 		return nil, err
 	}
@@ -62,7 +62,7 @@ func (s *Server) NewRun(ctx context.Context, req *analysispb.NewRunRequest) (*an
 		return nil, err
 	}
 
-	return mapToRunPb(r), nil
+	return runToPb(r), nil
 }
 
 // GetRun — unary. Ошибки логирует interceptor.
@@ -85,7 +85,7 @@ func (s *Server) GetRun(ctx context.Context, req *corepb.RunID) (*analysispb.Run
 		return nil, err
 	}
 
-	return mapToRunPb(r), nil
+	return runToPb(r), nil
 }
 
 // GetRunArchive — streaming. Конвертацию ошибок делает StreamError interceptor.
@@ -146,7 +146,7 @@ func (s *Server) ListRunsPaged(ctx context.Context, req *analysispb.ListRunsRequ
 		beforeID = &id
 	}
 
-	runs, hasMore, _, err := s.app.ListRunsPaged(ctx, int(limit), beforeID, userID, mapToRunFilter(req.GetFilter()))
+	runs, hasMore, _, err := s.app.ListRunsPaged(ctx, int(limit), beforeID, userID, runFilterFromPb(req.GetFilter()))
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +156,7 @@ func (s *Server) ListRunsPaged(ctx context.Context, req *analysispb.ListRunsRequ
 		HasMore: hasMore,
 	}
 	for _, r := range runs {
-		resp.Runs = append(resp.Runs, mapToRunPb(r))
+		resp.Runs = append(resp.Runs, runToPb(r))
 	}
 	return resp, nil
 }

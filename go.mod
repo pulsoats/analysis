@@ -5,8 +5,8 @@ go 1.25.3
 require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
-	github.com/pulsoats/contracts v1.10.0
-	github.com/pulsoats/core v1.11.3
+	github.com/pulsoats/contracts v1.11.0
+	github.com/pulsoats/core v1.12.0
 	github.com/rs/zerolog v1.35.1
 	golang.org/x/sync v0.20.0
 	google.golang.org/grpc v1.80.0

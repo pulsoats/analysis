@@ -13,7 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func mapToNewRunRequest(req *analysispb.NewRunRequest) (run.NewRunRequest, error) {
+func newRunFromRequestPb(req *analysispb.NewRunRequest) (run.NewRunRequest, error) {
 	if req == nil {
 		return run.NewRunRequest{}, errorsx.ErrInvalidArgument
 	}
@@ -29,7 +29,7 @@ func mapToNewRunRequest(req *analysispb.NewRunRequest) (run.NewRunRequest, error
 		return run.NewRunRequest{}, fmt.Errorf("interval %v: %w", req.Interval, errorsx.ErrInvalidArgument)
 	}
 
-	detector, err := mapToDetectorConfig(req.Detector)
+	detector, err := detectorConfigFromPb(req.Detector)
 	if err != nil {
 		return run.NewRunRequest{}, err
 	}
@@ -44,11 +44,11 @@ func mapToNewRunRequest(req *analysispb.NewRunRequest) (run.NewRunRequest, error
 		From:     req.From.AsTime(),
 		To:       req.To.AsTime(),
 		Detector: detector,
-		Fees:     mapToFees(req.Fees),
+		Fees:     feesFromPb(req.Fees),
 	}, nil
 }
 
-func mapToDetectorConfig(rawDetector *corepb.DetectorConfig) (detect.DetectorConfig, error) {
+func detectorConfigFromPb(rawDetector *corepb.DetectorConfig) (detect.DetectorConfig, error) {
 	if rawDetector == nil {
 		return detect.DetectorConfig{}, errorsx.ErrInvalidArgument
 	}
@@ -63,7 +63,7 @@ func mapToDetectorConfig(rawDetector *corepb.DetectorConfig) (detect.DetectorCon
 	}, nil
 }
 
-func mapToDetectorsPb(det detect.DetectorConfig) *corepb.DetectorConfig {
+func detectorConfigToPb(det detect.DetectorConfig) *corepb.DetectorConfig {
 	return &corepb.DetectorConfig{
 		Code:      det.Code,
 		OptsLabel: det.OptsLabel,
@@ -71,7 +71,7 @@ func mapToDetectorsPb(det detect.DetectorConfig) *corepb.DetectorConfig {
 	}
 }
 
-func mapToFees(f *corepb.Fees) *market.TakerMakerFees {
+func feesFromPb(f *corepb.Fees) *market.TakerMakerFees {
 	if f == nil {
 		return nil
 	}
@@ -81,7 +81,7 @@ func mapToFees(f *corepb.Fees) *market.TakerMakerFees {
 	}
 }
 
-func mapToRunPb(r run.Run) *analysispb.Run {
+func runToPb(r run.Run) *analysispb.Run {
 	runPb := &analysispb.Run{
 		BaseRun: &corepb.BaseRun{
 			Id: r.ID.String(),
@@ -89,9 +89,9 @@ func mapToRunPb(r run.Run) *analysispb.Run {
 				Code:    corepb.RunStatusCode(r.Status.Code),
 				Message: r.Status.Message,
 			},
-			Market:   mapToMarketSpecPb(r.Market),
+			Market:   marketSpecToPb(r.Market),
 			Interval: r.Interval.String(),
-			Detector: mapToDetectorsPb(r.Detector),
+			Detector: detectorConfigToPb(r.Detector),
 			SignalsCount: func() int64 {
 				if r.SignalsCount == nil {
 					return 0
@@ -123,7 +123,7 @@ func mapToRunPb(r run.Run) *analysispb.Run {
 	return runPb
 }
 
-func mapToRunFilter(f analysispb.RunFilter) run.Filter {
+func runFilterFromPb(f analysispb.RunFilter) run.Filter {
 	switch f {
 	case analysispb.RunFilter_RUN_FILTER_MINE:
 		return run.FilterMine
@@ -136,7 +136,7 @@ func mapToRunFilter(f analysispb.RunFilter) run.Filter {
 	}
 }
 
-func mapToMarketSpecPb(spec market.Spec) *corepb.MarketSpec {
+func marketSpecToPb(spec market.Spec) *corepb.MarketSpec {
 	return &corepb.MarketSpec{
 		Exchange: spec.Exchange,
 		Category: spec.Category,
