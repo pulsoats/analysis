@@ -9,31 +9,27 @@ import (
 	"strconv"
 	"syscall"
 
-	"github.com/google/uuid"
 	"github.com/pulsoats/analysis/internal/application/catalog"
 	apprun "github.com/pulsoats/analysis/internal/application/run"
-	appsystem "github.com/pulsoats/analysis/internal/application/system"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres/candle"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres/runs"
 	"github.com/pulsoats/analysis/internal/transport/xgrpc/analysis"
 	xrgpccatalog "github.com/pulsoats/analysis/internal/transport/xgrpc/catalog"
-	xgrpcsystem "github.com/pulsoats/analysis/internal/transport/xgrpc/system"
 	"github.com/rs/zerolog/log"
 
 	"github.com/pulsoats/analysis/internal/logger"
 	"github.com/pulsoats/analysis/internal/transport/xgrpc"
 	"github.com/pulsoats/core/detect/detectors"
 	"github.com/pulsoats/core/exchanges"
-	coresystem "github.com/pulsoats/core/system"
 	"github.com/pulsoats/core/tlsconfig"
+	"google.golang.org/grpc/health"
+	"google.golang.org/grpc/health/grpc_health_v1"
 )
 
 const (
 	envPostgresDSN    = "POSTGRES_DSN"
 	envRunsStorageDir = "RUNS_STORAGE_DIR"
-	envServiceID      = "SERVICE_ID"
-	envServiceName    = "SERVICE_NAME"
 	envGRPCHost       = "GRPC_HOST"
 	envGRPCPort       = "GRPC_PORT"
 	envTLSDisable     = "GRPC_TLS_DISABLE"
@@ -108,30 +104,8 @@ func main() {
 		zlog.Fatal().Err(err)
 	}
 
-	serviceID := uuid.New()
-	if rawServiceID := os.Getenv(envServiceID); rawServiceID != "" {
-		serviceID, err = uuid.Parse(rawServiceID)
-		if err != nil {
-			zlog.Fatal().Err(err).Str("service_id", rawServiceID).Msg("parse service id")
-		}
-	}
-	serviceName := os.Getenv(envServiceName)
-	if serviceName == "" {
-		serviceName = "analysis_" + serviceID.String()
-	}
-
-	systemApp := appsystem.NewApplication(coresystem.ServiceInfo{
-		ID:       serviceID,
-		Kind:     coresystem.ServiceKindAnalysis,
-		Name:     serviceName,
-		Exchange: "",
-		Account:  "analysis",
-		Version:  version,
-	}, pool)
-	serviceMonitorSrv, err := xgrpcsystem.NewServer(systemApp)
-	if err != nil {
-		zlog.Fatal().Err(err).Msg("init service monitor server")
-	}
+	healthSrv := health.NewServer()
+	healthSrv.SetServingStatus("", grpc_health_v1.HealthCheckResponse_SERVING)
 
 	host := os.Getenv(envGRPCHost)
 	if host == "" {
@@ -146,11 +120,11 @@ func main() {
 	tlsDisable, _ := strconv.ParseBool(os.Getenv(envTLSDisable))
 
 	serverCfg := xgrpc.Config{
-		Addr:                 addr,
-		AnalysisServer:       analysisSrv,
-		CatalogServer:        catalogSrv,
-		ServiceMonitorServer: serviceMonitorSrv,
-		Logger:               slogLogger,
+		Addr:           addr,
+		AnalysisServer: analysisSrv,
+		CatalogServer:  catalogSrv,
+		HealthServer:   healthSrv,
+		Logger:         slogLogger,
 	}
 	if tlsDisable {
 		zlog.Warn().Msg("TLS disabled — insecure mode")

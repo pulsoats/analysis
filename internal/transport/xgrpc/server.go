@@ -10,19 +10,19 @@ import (
 	"github.com/pulsoats/analysis/internal/transport/xgrpc/interceptor"
 	analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
 	catalogpb "github.com/pulsoats/contracts/gen/go/catalog/v1"
-	systempb "github.com/pulsoats/contracts/gen/go/system/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/reflection"
 )
 
 type Config struct {
-	Addr                 string
-	AnalysisServer       analysispb.AnalysisServer
-	CatalogServer        catalogpb.CatalogServer
-	ServiceMonitorServer systempb.ServiceMonitorServer
-	Logger               *slog.Logger
-	TLSConfig            *tls.Config
+	Addr           string
+	AnalysisServer analysispb.AnalysisServer
+	CatalogServer  catalogpb.CatalogServer
+	HealthServer   grpc_health_v1.HealthServer
+	Logger         *slog.Logger
+	TLSConfig      *tls.Config
 }
 
 func RunGRPCServer(ctx context.Context, cfg Config) error {
@@ -30,7 +30,10 @@ func RunGRPCServer(ctx context.Context, cfg Config) error {
 		return errors.New("grpc: analysis server is nil")
 	}
 	if cfg.CatalogServer == nil {
-		return errors.New("grpc: analysis server is nil")
+		return errors.New("grpc: catalog server is nil")
+	}
+	if cfg.HealthServer == nil {
+		return errors.New("grpc: health server is nil")
 	}
 	log := cfg.Logger
 	if cfg.Logger == nil {
@@ -61,7 +64,7 @@ func RunGRPCServer(ctx context.Context, cfg Config) error {
 
 	analysispb.RegisterAnalysisServer(server, cfg.AnalysisServer)
 	catalogpb.RegisterCatalogServer(server, cfg.CatalogServer)
-	systempb.RegisterServiceMonitorServer(server, cfg.ServiceMonitorServer)
+	grpc_health_v1.RegisterHealthServer(server, cfg.HealthServer)
 
 	if ctx != nil {
 		go func() {

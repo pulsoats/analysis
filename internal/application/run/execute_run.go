@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/pulsoats/analysis/internal/domain/run"
 	"github.com/pulsoats/analysis/internal/domain/signal"
 	"github.com/pulsoats/analysis/internal/utils/files"
@@ -57,7 +56,6 @@ func (s *Application) executeRun(r run.Run, detector detect.CandleDetector, fees
 
 	signals := make([]signal.AnalysisSignal, 0, 128)
 	ws := detector.WindowSize()
-	seen := make(map[uuid.UUID]struct{})
 	for i := ws - 1; i < len(candles); i++ {
 		window := candles[i-ws+1 : i+1]
 		if err := ctx.Err(); err != nil {
@@ -73,10 +71,6 @@ func (s *Application) executeRun(r run.Run, detector detect.CandleDetector, fees
 		if !ok {
 			continue
 		}
-		if _, exists := seen[sig.Fingerprint]; exists {
-			continue
-		}
-		seen[sig.Fingerprint] = struct{}{}
 		signals = append(signals, signal.AnalysisSignal{Signal: sig, Index: i})
 	}
 	log.Debug("signals detected", "count", len(signals))
