@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pulsoats/analysis/internal/domain/candle"
 	"github.com/pulsoats/analysis/internal/domain/run"
-	"github.com/pulsoats/core/detect/detectors"
+	"github.com/pulsoats/core/detect/detector"
 	"github.com/pulsoats/core/errorsx"
 	corerun "github.com/pulsoats/core/run"
 	"golang.org/x/sync/singleflight"
@@ -25,7 +25,7 @@ type Config struct {
 	RunRepository     run.Repository
 	CandleRepository  candle.Repository
 	Exchanges         map[string]exchange.PublicClient
-	DetectorsRegistry *detectors.Registry
+	DetectorsRegistry *detector.Registry
 	StorageDir        string
 	Logger            *slog.Logger
 	TxManager         domain.TxManager
@@ -35,7 +35,7 @@ type Application struct {
 	runRepo     run.Repository
 	candleRepo  candle.Repository
 	exchanges   map[string]exchange.PublicClient
-	detRegistry *detectors.Registry
+	detRegistry *detector.Registry
 	storageDir  string
 	log         *slog.Logger
 	candlesSF   singleflight.Group
@@ -53,7 +53,7 @@ func NewApplication(cfg Config) (*Application, error) {
 		return nil, errors.New("run app: empty exchange clients map")
 	}
 	if cfg.DetectorsRegistry == nil {
-		return nil, errors.New("run app: nil detectors registry")
+		return nil, errors.New("run app: nil detector registry")
 	}
 	if cfg.StorageDir == "" {
 		return nil, errors.New("run app: empty storage dir")
@@ -116,12 +116,12 @@ func (s *Application) NewRun(ctx context.Context, req run.NewRunRequest) (run.Ru
 		fees = *req.Fees
 	}
 
-	optsAny, err := s.detRegistry.UnmarshalOpts(req.Detector.Code, req.Detector.Opts)
+	optsAny, err := s.detRegistry.UnmarshalOpts(req.Detector.Code, req.Detector.Version, req.Detector.Opts)
 	if err != nil {
 		return run.Run{}, fmt.Errorf("decode detector opts: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
-	detector, err := s.detRegistry.NewCandle(req.Detector.Code, req.Detector.OptsLabel, optsAny)
+	det, err := s.detRegistry.NewCandle(req.Detector.Code, req.Detector.Version, req.Detector.OptsLabel, optsAny)
 	if err != nil {
 		return run.Run{}, fmt.Errorf("build detector: %w", errors.Join(errorsx.ErrInternal, err))
 	}
@@ -145,7 +145,7 @@ func (s *Application) NewRun(ctx context.Context, req run.NewRunRequest) (run.Ru
 		return run.Run{}, fmt.Errorf("new run: %w", err)
 	}
 
-	go s.executeRun(r, detector, fees)
+	go s.executeRun(r, det, fees)
 
 	return r, nil
 }

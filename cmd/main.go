@@ -16,11 +16,12 @@ import (
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres/runs"
 	"github.com/pulsoats/analysis/internal/transport/xgrpc/analysis"
 	xrgpccatalog "github.com/pulsoats/analysis/internal/transport/xgrpc/catalog"
+	"github.com/pulsoats/core/detect/detector"
+	"github.com/pulsoats/detectors"
 	"github.com/rs/zerolog/log"
 
 	"github.com/pulsoats/analysis/internal/logger"
 	"github.com/pulsoats/analysis/internal/transport/xgrpc"
-	"github.com/pulsoats/core/detect/detectors"
 	"github.com/pulsoats/core/exchanges"
 	"github.com/pulsoats/core/tlsconfig"
 	"google.golang.org/grpc/health"
@@ -54,7 +55,10 @@ func main() {
 	}
 	defer pool.Close()
 
-	detectorRegistry := detectors.NewDefaultRegistry()
+	detectorRegistry := detector.NewRegistry()
+	if err = detectors.RegisterAll(detectorRegistry); err != nil {
+		log.Fatal().Err(err).Msg("register detectors")
+	}
 
 	exReg := exchanges.NewRegistry(slogLogger)
 	exchangeAPIs, err := exReg.CreateAllPublic(slogLogger)

@@ -31,8 +31,10 @@ github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZb
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
 github.com/pulsoats/contracts v1.11.0 h1:SvXKHNUean2CWV65s8l+NqpekrP8+bDvdgQmIIeYJAA=
 github.com/pulsoats/contracts v1.11.0/go.mod h1:tALJFOoAijHLIKzqkTYDbVEou0fmUqfUWSsvxGS1XOU=
-github.com/pulsoats/core v1.12.0 h1:x73t78m4t1jIq1TbKsyhJikij7pCl4HNsZ8LzpWgce0=
-github.com/pulsoats/core v1.12.0/go.mod h1:6yUNEmr/1UyDDIKzeTo/80BjTYUdD3YK2OJK8hMGG5g=
+github.com/pulsoats/core v1.15.0 h1:W/WeGSmX0dZmdj12EYi42ABafAMOdbOfG48O17MfpoI=
+github.com/pulsoats/core v1.15.0/go.mod h1:6yUNEmr/1UyDDIKzeTo/80BjTYUdD3YK2OJK8hMGG5g=
+github.com/pulsoats/detectors v0.0.0-20260605090801-ab7ac15c8f90 h1:3FldjOhFmmJwlMNABHx+2THaL/SoUsMS/nlxdQyUlzI=
+github.com/pulsoats/detectors v0.0.0-20260605090801-ab7ac15c8f90/go.mod h1:Rm6IC8PqUoh8qWrAtIiMiqa0Wtu35/gpFeLw0vLbPc8=
 github.com/rs/zerolog v1.35.1 h1:m7xQeoiLIiV0BCEY4Hs+j2NG4Gp2o2KPKmhnnLiazKI=
 github.com/rs/zerolog v1.35.1/go.mod h1:EjML9kdfa/RMA7h/6z6pYmq1ykOuA8/mjWaEvGI+jcw=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=

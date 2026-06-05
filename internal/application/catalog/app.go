@@ -5,28 +5,28 @@ import (
 	"slices"
 
 	"github.com/pulsoats/core/detect"
-	"github.com/pulsoats/core/detect/detectors"
+	"github.com/pulsoats/core/detect/detector"
 	"github.com/pulsoats/core/exchange"
 )
 
 type Application struct {
-	detReg    *detectors.Registry
+	detReg    *detector.Registry
 	exchanges map[string]exchange.PublicClient
 }
 
-func NewApplication(detectorsRegistry *detectors.Registry, exchanges map[string]exchange.PublicClient) (*Application, error) {
-	if detectorsRegistry == nil {
-		return nil, fmt.Errorf("detectors app: detectors registry is nil")
+func NewApplication(detectorRegistry *detector.Registry, exchanges map[string]exchange.PublicClient) (*Application, error) {
+	if detectorRegistry == nil {
+		return nil, fmt.Errorf("detector app: detector registry is nil")
 	}
 
 	return &Application{
-		detReg:    detectorsRegistry,
+		detReg:    detectorRegistry,
 		exchanges: exchanges,
 	}, nil
 }
 
 // ListAvailableDetectors возвращает слайс метаданных по каждому из встроенных детекторов.
-// Метаданные берутся из реестра детекторов detectors.Registry.
+// Метаданные берутся из реестра детекторов detector.Registry.
 func (a *Application) ListAvailableDetectors() []detect.DetectorMeta {
 	return a.detReg.ListMetas()
 }
