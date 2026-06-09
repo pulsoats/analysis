@@ -55,8 +55,6 @@ migrations/               SQL-миграции схемы analysis
 | `GRPC_TLS_KEY_FILE` | private key для gRPC TLS/mTLS | нет |
 | `GRPC_TLS_CA_FILE` | CA certificate для проверки клиентов | нет |
 | `GRPC_TLS_DISABLE` | локальная опция отключения TLS | `false` |
-| `SERVICE_ID` | UUID сервиса в `ServiceMonitor/Info` | генерируется при старте |
-| `SERVICE_NAME` | имя сервиса в `ServiceMonitor/Info` | `analysis_<uuid>` |
 | `LOG_LEVEL` | уровень логирования: `debug`, `info`, `warn`, `error` | `info` |
 | `LOG_FORMAT` | формат логов: `json` или `console` | `console` |
 
@@ -158,7 +156,7 @@ x-user-id: <user-id>
 
 Минимальные требования:
 
-- Go `1.25.3`;
+- Go `1.26.2`;
 - PostgreSQL с TimescaleDB;
 - примененные SQL-миграции из `migrations/`;
 - доступ к private Go modules `github.com/pulsoats/*`;
