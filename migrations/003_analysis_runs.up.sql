@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS analysis.runs
     symbol            TEXT        NOT NULL,
     interval          TEXT        NOT NULL,
     detector_code     TEXT        NOT NULL,
+    detector_version  TEXT        NOT NULL,
     detector_label    TEXT        NOT NULL,
     detector_opts     JSONB       NOT NULL,
     first_candle_time TIMESTAMPTZ NOT NULL,

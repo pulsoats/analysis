@@ -11,13 +11,12 @@ import (
 	corerun "github.com/pulsoats/core/run"
 )
 
-type Filter int
+type Scope string
 
 const (
-	FilterUnspecified Filter = iota
-	FilterMine
-	FilterShared
-	FilterAll
+	ScopeMine   Scope = "mine"   // прогоны текущего пользователя (по умолчанию)
+	ScopeShared Scope = "shared" // расшаренные другими
+	ScopeAll    Scope = "all"
 )
 
 // Run описывает агрегированный результат прогона исторического сервиса.
@@ -38,11 +37,48 @@ func (r Run) String() string {
 	return string(b)
 }
 
+// Filter — параметры выборки прогонов.
+type Filter struct {
+	Exchanges     []string // market.exchange IN (...)
+	Categories    []string // market.category IN (...)
+	Symbols       []string // market.symbol   IN (...)
+	Intervals     []string // interval        IN (...)
+	DetectorCodes []string // detector.code   IN (...)
+	Statuses      []int    // status.code     IN (...), 0..4
+
+	MinSignals      *int64 // signalsCount >= / <=
+	MaxSignals      *int64
+	MinAvgProfitPPM *int64 // avgProfitPPM >= / <= (перевести в PPM)
+	MaxAvgProfitPPM *int64
+
+	// период свечей (колонка Period = firstCandleTime → lastCandleTime)
+	FirstCandleFrom *time.Time // first_candle_time >= FirstCandleFrom
+	LastCandleTo    *time.Time // last_candle_time  <= LastCandleTo
+
+	CreatedFrom *time.Time // createdAt >= / <=
+	CreatedTo   *time.Time
+}
+
+type RunsPagedRequest struct {
+	Limit       int
+	BeforeID    *uuid.UUID
+	UserID      string
+	OrderDirAsc bool
+	Scope       Scope
+	Filter      *Filter
+}
+
+type RunsPagedResponse struct {
+	Runs         []Run
+	HasMore      bool
+	NextBeforeID *uuid.UUID
+}
+
 type Repository interface {
 	CreateRun(ctx context.Context, run *Run) error
 	UpdateRun(ctx context.Context, run Run) error
 	RunByID(ctx context.Context, runID uuid.UUID) (Run, error)
-	ListRunsPaged(ctx context.Context, limit int, beforeID *uuid.UUID, callerID string, filter Filter) ([]Run, bool, *uuid.UUID, error)
+	RunsPaged(ctx context.Context, req RunsPagedRequest) (RunsPagedResponse, error)
 	ShareRun(ctx context.Context, runID uuid.UUID, callerID string) error
 	DeleteRun(ctx context.Context, runID uuid.UUID) error
 }

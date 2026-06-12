@@ -219,11 +219,19 @@ func (s *Application) DeleteRun(ctx context.Context, runID uuid.UUID, userID str
 	return nil
 }
 
-func (s *Application) ListRunsPaged(ctx context.Context, limit int, beforeID *uuid.UUID, callerID string, filter run.Filter) ([]run.Run, bool, *uuid.UUID, error) {
-	if limit <= 0 {
-		return nil, false, nil, fmt.Errorf("list runs paged: limit %d: %w", limit, errorsx.ErrInvalidArgument)
+const (
+	defaultRunsPagedLimit = 20
+	maxRunsPagedLimit     = 100
+)
+
+func (s *Application) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.RunsPagedResponse, error) {
+	switch {
+	case req.Limit <= 0:
+		req.Limit = defaultRunsPagedLimit
+	case req.Limit > maxRunsPagedLimit:
+		req.Limit = maxRunsPagedLimit
 	}
-	return s.runRepo.ListRunsPaged(ctx, limit, beforeID, callerID, filter)
+	return s.runRepo.RunsPaged(ctx, req)
 }
 
 func (s *Application) runZipPath(runID uuid.UUID) string {

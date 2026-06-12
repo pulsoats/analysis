@@ -17,11 +17,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-const (
-	defaultListRunsLimit = 20
-	maxListRunsLimit     = 100
-)
-
 type Server struct {
 	analysispb.UnimplementedAnalysisServer
 	app app
@@ -119,7 +114,7 @@ func (s *Server) GetRunArchive(req *corepb.RunID, stream analysispb.Analysis_Get
 	return nil
 }
 
-func (s *Server) ListRunsPaged(ctx context.Context, req *analysispb.ListRunsRequest) (*analysispb.ListRunsResponse, error) {
+func (s *Server) ListRunsPaged(ctx context.Context, req *analysispb.ListRunsPagedRequest) (*analysispb.ListRunsPagedResponse, error) {
 	if req == nil {
 		return nil, status.Error(codes.InvalidArgument, "nil request")
 	}
@@ -129,36 +124,19 @@ func (s *Server) ListRunsPaged(ctx context.Context, req *analysispb.ListRunsRequ
 		return nil, status.Error(codes.Internal, "missing user-id in ctx")
 	}
 
-	limit := req.GetLimit()
-	switch {
-	case limit <= 0:
-		limit = defaultListRunsLimit
-	case limit > maxListRunsLimit:
-		limit = maxListRunsLimit
-	}
-
-	var beforeID *uuid.UUID
-	if req.BeforeId != nil {
-		id, err := uuid.Parse(*req.BeforeId)
-		if err != nil {
-			return nil, status.Error(codes.InvalidArgument, "invalid before_id")
-		}
-		beforeID = &id
-	}
-
-	runs, hasMore, _, err := s.app.ListRunsPaged(ctx, int(limit), beforeID, userID, runFilterFromPb(req.GetFilter()))
+	reqFromPb, err := listRunsPagedRequestFromPb(req)
 	if err != nil {
 		return nil, err
 	}
 
-	resp := &analysispb.ListRunsResponse{
-		Runs:    make([]*analysispb.Run, 0, len(runs)),
-		HasMore: hasMore,
+	reqFromPb.UserID = userID
+
+	runsResp, err := s.app.RunsPaged(ctx, reqFromPb)
+	if err != nil {
+		return nil, err
 	}
-	for _, r := range runs {
-		resp.Runs = append(resp.Runs, runToPb(r))
-	}
-	return resp, nil
+
+	return listRunsPagedResponseToPb(runsResp), nil
 }
 
 func (s *Server) ShareRun(ctx context.Context, req *corepb.RunID) (*emptypb.Empty, error) {

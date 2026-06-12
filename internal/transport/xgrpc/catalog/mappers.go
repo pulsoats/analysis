@@ -10,10 +10,10 @@ import (
 func mapToDetectorMetaPb(meta detect.DetectorMeta) *corepb.DetectorMeta {
 	return &corepb.DetectorMeta{
 		Code:        meta.Code,
-		Description: meta.Description,
-		Kind:        string(meta.Kind),
-		OptsSchema:  meta.OptsSchema,
 		Version:     meta.Version,
+		Kind:        string(meta.Kind),
+		Description: meta.Description,
+		OptsSchema:  meta.OptsSchema,
 	}
 }
 

@@ -25,10 +25,10 @@ func (r *repo) CreateRun(ctx context.Context, run *run.Run) error {
 	const query = `
 		INSERT INTO analysis.runs (
 			id, exchange, category, symbol, interval,
-			detector_code, detector_label, detector_opts,
+			detector_code, detector_version, detector_label, detector_opts,
 			first_candle_time, last_candle_time, status_code, status_message, created_by
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, $14)
 		RETURNING created_at;
 	`
 
@@ -41,6 +41,8 @@ func (r *repo) CreateRun(ctx context.Context, run *run.Run) error {
 		run.Market.Symbol,
 		run.Interval.String(),
 		run.Detector.Code,
+		run.Detector.Version,
+		run.Detector.Version,
 		run.Detector.OptsLabel,
 		run.Detector.Opts,
 		run.FirstCandleTime,
@@ -94,24 +96,10 @@ func (r *repo) UpdateRun(ctx context.Context, res run.Run) error {
 func (r *repo) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
 	const query = `
 		SELECT
-			id,
-			exchange,
-			category,
-			symbol,
-			interval,
-			detector_code,
-			detector_label,
-			detector_opts,
-			first_candle_time,
-			last_candle_time,
-			signals_count,
-			avg_profit_ppm,
-			created_by,
-			created_at,
-			status_code,
-			status_message,
-			is_shared,
-			shared_at
+			id, exchange, category, symbol, interval,
+			detector_code, detector_version, detector_label, detector_opts,
+			first_candle_time, last_candle_time, signals_count, avg_profit_ppm,
+			created_by, created_at, status_code, status_message, is_shared, shared_at
 		FROM analysis.runs
 		WHERE id = $1;
 	`
@@ -127,6 +115,7 @@ func (r *repo) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
 		&res.Market.Symbol,
 		&interval,
 		&res.Detector.Code,
+		&res.Detector.Version,
 		&res.Detector.OptsLabel,
 		&res.Detector.Opts,
 		&res.FirstCandleTime,
@@ -152,110 +141,181 @@ func (r *repo) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
 	return res, nil
 }
 
-func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *uuid.UUID, callerID string, filter run.Filter) ([]run.Run, bool, *uuid.UUID, error) {
-	if limit <= 0 {
-		return nil, false, nil, fmt.Errorf("list runs paged: limit %d: %w", limit, errorsx.ErrInvalidArgument)
+func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.RunsPagedResponse, error) {
+	const baseQuery = `
+	SELECT
+    	id, exchange, category, symbol, interval,
+		detector_code, detector_version, detector_label, detector_opts,
+		first_candle_time, last_candle_time, signals_count, avg_profit_ppm,
+		created_by, created_at, status_code, status_message, is_shared, shared_at
+	FROM analysis.runs
+	WHERE 1 = 1`
+
+	if req.Limit <= 0 {
+		return run.RunsPagedResponse{}, fmt.Errorf("runs paged: limit %d: %w", req.Limit, errorsx.ErrInvalidArgument)
 	}
 
-	// $1 = beforeID, $2 = limit+1, $3 = callerID
-	const (
-		queryMine = `
-			SELECT
-				id, exchange, category, symbol, interval,
-				detector_code, detector_label, detector_opts,
-				first_candle_time, last_candle_time, signals_count, avg_profit_ppm,
-				created_by, created_at, status_code, status_message,
-				is_shared, shared_at
-			FROM analysis.runs
-			WHERE created_by = $3
-			  AND status_code IN (3, 4)
-			  AND ($1::uuid IS NULL OR id < $1)
-			ORDER BY id DESC
-			LIMIT $2;`
-		queryShared = `
-			SELECT
-				id, exchange, category, symbol, interval,
-				detector_code, detector_label, detector_opts,
-				first_candle_time, last_candle_time, signals_count, avg_profit_ppm,
-				created_by, created_at, status_code, status_message,
-				is_shared, shared_at
-			FROM analysis.runs
-			WHERE is_shared = true AND created_by != $3
-			  AND status_code IN (3, 4)
-			  AND ($1::uuid IS NULL OR id < $1)
-			ORDER BY id DESC
-			LIMIT $2;`
-		queryAll = `
-			SELECT
-				id, exchange, category, symbol, interval,
-				detector_code, detector_label, detector_opts,
-				first_candle_time, last_candle_time, signals_count, avg_profit_ppm,
-				created_by, created_at, status_code, status_message,
-				is_shared, shared_at
-			FROM analysis.runs
-			WHERE (created_by = $3 OR is_shared = true)
-			  AND status_code IN (3, 4)
-			  AND ($1::uuid IS NULL OR id < $1)
-			ORDER BY id DESC
-			LIMIT $2;`
-	)
+	query := baseQuery
+	var args []any
+	argN := 1
+
+	scopeQuery := fmt.Sprintf(" AND created_by = $%d", argN)
+	switch req.Scope {
+	case run.ScopeShared:
+		scopeQuery += fmt.Sprintf("AND (is_shared =  true AND created_by != $%d)", argN)
+	case run.ScopeAll:
+		scopeQuery += fmt.Sprintf("AND (created_by = $%d OR is_shared = true)", argN)
+	}
+
+	query += scopeQuery
+	args = append(args, req.UserID)
+	argN++
+
+	if req.Filter != nil {
+		if len(req.Filter.Exchanges) > 0 {
+			query += fmt.Sprintf(" AND exchange = ANY($%d)", argN)
+			args = append(args, req.Filter.Exchanges)
+			argN++
+		}
+
+		if len(req.Filter.Categories) > 0 {
+			query += fmt.Sprintf(" AND category = ANY($%d)", argN)
+			args = append(args, req.Filter.Categories)
+			argN++
+		}
+
+		if len(req.Filter.Symbols) > 0 {
+			query += fmt.Sprintf(" AND symbol = ANY($%d)", argN)
+			args = append(args, req.Filter.Symbols)
+			argN++
+		}
+
+		if len(req.Filter.Intervals) > 0 {
+			query += fmt.Sprintf(" AND interval = ANY($%d)", argN)
+			args = append(args, req.Filter.Intervals)
+			argN++
+		}
+
+		if len(req.Filter.DetectorCodes) > 0 {
+			query += fmt.Sprintf(" AND detector_code = ANY($%d)", argN)
+			args = append(args, req.Filter.DetectorCodes)
+			argN++
+		}
+
+		if len(req.Filter.Statuses) > 0 {
+			query += fmt.Sprintf(" AND status_code = ANY($%d)", argN)
+			args = append(args, req.Filter.Statuses)
+			argN++
+		}
+
+		if req.Filter.MinSignals != nil {
+			query += fmt.Sprintf(" AND signals_count >= $%d", argN)
+			args = append(args, req.Filter.MinSignals)
+			argN++
+		}
+
+		if req.Filter.MaxSignals != nil {
+			query += fmt.Sprintf(" AND signals_count <= $%d", argN)
+			args = append(args, req.Filter.MaxSignals)
+			argN++
+		}
+
+		if req.Filter.MinAvgProfitPPM != nil {
+			query += fmt.Sprintf(" AND avg_profit_ppm >= $%d", argN)
+			args = append(args, req.Filter.MinAvgProfitPPM)
+			argN++
+		}
+
+		if req.Filter.MaxAvgProfitPPM != nil {
+			query += fmt.Sprintf(" AND avg_profit_ppm <= $%d", argN)
+			args = append(args, req.Filter.MaxAvgProfitPPM)
+			argN++
+		}
+
+		if req.Filter.FirstCandleFrom != nil {
+			query += fmt.Sprintf(" AND first_candle_time >= $%d", argN)
+			args = append(args, req.Filter.FirstCandleFrom)
+			argN++
+		}
+
+		if req.Filter.LastCandleTo != nil {
+			query += fmt.Sprintf(" AND last_candle_time <= $%d", argN)
+			args = append(args, req.Filter.LastCandleTo)
+			argN++
+		}
+
+		if req.Filter.CreatedFrom != nil {
+			query += fmt.Sprintf(" AND created_at >= $%d", argN)
+			args = append(args, req.Filter.CreatedFrom)
+			argN++
+		}
+
+		if req.Filter.CreatedTo != nil {
+			query += fmt.Sprintf(" AND created_at <= $%d", argN)
+			args = append(args, req.Filter.CreatedTo)
+			argN++
+		}
+	}
+
+	orderQuery := " ORDER BY DESC"
+	if req.OrderDirAsc {
+		orderQuery = "ORDER BY ASC"
+	}
+	query += orderQuery
+
+	query += fmt.Sprintf(" LIMIT $%d", argN)
+	args = append(args, req.Limit+1)
 
 	q := r.qp.Get(ctx)
 
-	query := queryMine
-	switch filter {
-	case run.FilterShared:
-		query = queryShared
-	case run.FilterAll:
-		query = queryAll
-	}
-
-	rows, err := q.Query(ctx, query, beforeID, limit+1, callerID)
+	rows, err := q.Query(ctx, query, args)
 	if err != nil {
-		return nil, false, nil, fmt.Errorf("list runs paged: %w", errors.Join(errorsx.ErrInternal, err))
+		return run.RunsPagedResponse{}, fmt.Errorf("runs paged: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 	defer rows.Close()
 
 	runs, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (run.Run, error) {
-		var newRun run.Run
+		var res run.Run
 		var rawInterval string
 
 		if err := row.Scan(
-			&newRun.ID,
-			&newRun.Market.Exchange,
-			&newRun.Market.Category,
-			&newRun.Market.Symbol,
+			&res.ID,
+			&res.Market.Exchange,
+			&res.Market.Category,
+			&res.Market.Symbol,
 			&rawInterval,
-			&newRun.Detector.Code,
-			&newRun.Detector.OptsLabel,
-			&newRun.Detector.Opts,
-			&newRun.FirstCandleTime,
-			&newRun.LastCandleTime,
-			&newRun.SignalsCount,
-			&newRun.AvgProfitPPM,
-			&newRun.CreatedBy,
-			&newRun.CreatedAt,
-			&newRun.Status.Code,
-			&newRun.Status.Message,
-			&newRun.IsShared,
-			&newRun.SharedAt,
+			&res.Detector.Code,
+			&res.Detector.Version,
+			&res.Detector.OptsLabel,
+			&res.Detector.Code,
+			&res.Detector.Opts,
+			&res.FirstCandleTime,
+			&res.LastCandleTime,
+			&res.SignalsCount,
+			&res.AvgProfitPPM,
+			&res.CreatedBy,
+			&res.CreatedAt,
+			&res.Status.Code,
+			&res.Status.Message,
+			&res.IsShared,
+			&res.SharedAt,
 		); err != nil {
 			return run.Run{}, err
 		}
 
 		if iv, ok := market.ParseInterval(rawInterval); ok {
-			newRun.Interval = iv
+			res.Interval = iv
 		}
 
-		return newRun, nil
+		return res, nil
 	})
 	if err != nil {
-		return nil, false, nil, fmt.Errorf("collect runs paged: %w", errors.Join(errorsx.ErrInternal, err))
+		return run.RunsPagedResponse{}, fmt.Errorf("collect runs paged: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
-	hasMore := len(runs) > limit
+	hasMore := len(runs) > req.Limit
 	if hasMore {
-		runs = runs[:limit]
+		runs = runs[:req.Limit]
 	}
 
 	var nextBeforeID *uuid.UUID
@@ -264,7 +324,11 @@ func (r *repo) ListRunsPaged(ctx context.Context, limit int, beforeID *uuid.UUID
 		nextBeforeID = &lastID
 	}
 
-	return runs, hasMore, nextBeforeID, nil
+	return run.RunsPagedResponse{
+		Runs:         runs,
+		HasMore:      hasMore,
+		NextBeforeID: nextBeforeID,
+	}, nil
 }
 
 func (r *repo) ShareRun(ctx context.Context, runID uuid.UUID, callerID string) error {
