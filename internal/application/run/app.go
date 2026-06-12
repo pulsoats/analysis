@@ -21,6 +21,11 @@ import (
 	"github.com/pulsoats/core/exchange"
 )
 
+const (
+	defaultRunsPagedLimit = 20
+	maxRunsPagedLimit     = 100
+)
+
 type Config struct {
 	RunRepository     run.Repository
 	CandleRepository  candle.Repository
@@ -218,11 +223,6 @@ func (s *Application) DeleteRun(ctx context.Context, runID uuid.UUID, userID str
 	}
 	return nil
 }
-
-const (
-	defaultRunsPagedLimit = 20
-	maxRunsPagedLimit     = 100
-)
 
 func (s *Application) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.RunsPagedResponse, error) {
 	switch {

@@ -71,6 +71,7 @@ func (s *Application) executeRun(r run.Run, detector detect.CandleDetector, fees
 		if !ok {
 			continue
 		}
+		sig.Interval = r.Interval
 		signals = append(signals, signal.AnalysisSignal{Signal: sig, Index: i})
 	}
 	log.Debug("signals detected", "count", len(signals))
