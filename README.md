@@ -8,12 +8,12 @@
 - валидирует рынок, период, интервал, детектор и параметры комиссий;
 - получает исторические свечи из exchange clients `pulsoats/core/exchanges`;
 - кэширует свечи в таблице `analysis.candles`;
-- запускает candle-detector из registry `pulsoats/core/detect/detectors`;
+- запускает candle-detector из registry `github.com/pulsoats/detectors`;
 - пересчитывает результат сигналов на минимальном таймфрейме `1m`;
 - сохраняет статус, количество сигналов и среднюю доходность в `analysis.runs`;
 - собирает ZIP-архив с CSV/JSON артефактами;
 - отдает метаданные прогонов, список прогонов, публикацию, удаление и stream архива по gRPC;
-- отдает служебную информацию и runtime metrics через `ServiceMonitor`.
+- отвечает на health-check запросы через стандартный `grpc.health.v1.Health`.
 
 ## Поток выполнения прогона
 
@@ -32,8 +32,8 @@
 ## Структура проекта
 
 ```text
-cmd/analysis/             точка входа, wiring зависимостей и запуск gRPC
-internal/application/     application layer: run, catalog, system
+cmd/                      точка входа, wiring зависимостей и запуск gRPC
+internal/application/     application layer: run, catalog
 internal/domain/          доменные модели и интерфейсы репозиториев
 internal/infrastructure/  PostgreSQL pool, tx manager и репозитории
 internal/transport/xgrpc/ gRPC servers, mappers и interceptors
@@ -128,10 +128,10 @@ Primary key `analysis.candles`:
 - `ListAvailableDetectors`
 - `ListAvailableExchanges`
 
-`pulsoats.system.v1.ServiceMonitor`:
+`grpc.health.v1.Health`:
 
-- `Info`
-- `Metrics`
+- `Check`
+- `Watch`
 
 ### Metadata
 
