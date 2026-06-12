@@ -60,6 +60,7 @@ func detectorConfigFromPb(rawDetector *corepb.DetectorConfig) (detect.DetectorCo
 
 	return detect.DetectorConfig{
 		Code:      rawDetector.Code,
+		Version:   rawDetector.Version,
 		OptsLabel: rawDetector.OptsLabel,
 		Opts:      rawDetector.Opts,
 	}, nil
@@ -68,6 +69,7 @@ func detectorConfigFromPb(rawDetector *corepb.DetectorConfig) (detect.DetectorCo
 func detectorConfigToPb(det detect.DetectorConfig) *corepb.DetectorConfig {
 	return &corepb.DetectorConfig{
 		Code:      det.Code,
+		Version:   det.Version,
 		OptsLabel: det.OptsLabel,
 		Opts:      det.Opts,
 	}
@@ -94,12 +96,7 @@ func runToPb(r run.Run) *analysispb.Run {
 			Market:   marketSpecToPb(r.Market),
 			Interval: r.Interval.String(),
 			Detector: detectorConfigToPb(r.Detector),
-			SignalsCount: func() int64 {
-				if r.SignalsCount == nil {
-					return 0
-				}
-				return *r.SignalsCount
-			}(),
+			SignalsCount: r.SignalsCount,
 			CreatedBy: r.CreatedBy,
 			CreatedAt: timestamppb.New(r.CreatedAt),
 		},

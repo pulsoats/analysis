@@ -23,7 +23,6 @@ const (
 type Run struct {
 	corerun.Base
 	Fees         market.TakerMakerFees
-	SignalsCount *int64
 	AvgProfitPPM *int64
 	IsShared     bool
 	SharedAt     *time.Time

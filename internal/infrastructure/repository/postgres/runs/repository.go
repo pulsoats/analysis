@@ -28,7 +28,7 @@ func (r *repo) CreateRun(ctx context.Context, run *run.Run) error {
 			detector_code, detector_version, detector_label, detector_opts,
 			first_candle_time, last_candle_time, status_code, status_message, created_by
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13, $14)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 		RETURNING created_at;
 	`
 
@@ -41,7 +41,6 @@ func (r *repo) CreateRun(ctx context.Context, run *run.Run) error {
 		run.Market.Symbol,
 		run.Interval.String(),
 		run.Detector.Code,
-		run.Detector.Version,
 		run.Detector.Version,
 		run.Detector.OptsLabel,
 		run.Detector.Opts,
@@ -159,17 +158,29 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 	var args []any
 	argN := 1
 
-	scopeQuery := fmt.Sprintf(" AND created_by = $%d", argN)
+	var scopeQuery string
 	switch req.Scope {
 	case run.ScopeShared:
-		scopeQuery += fmt.Sprintf("AND (is_shared =  true AND created_by != $%d)", argN)
+		scopeQuery = fmt.Sprintf(" AND is_shared = true AND created_by != $%d", argN)
 	case run.ScopeAll:
-		scopeQuery += fmt.Sprintf("AND (created_by = $%d OR is_shared = true)", argN)
+		scopeQuery = fmt.Sprintf(" AND (created_by = $%d OR is_shared = true)", argN)
+	default:
+		scopeQuery = fmt.Sprintf(" AND created_by = $%d", argN)
 	}
 
 	query += scopeQuery
 	args = append(args, req.UserID)
 	argN++
+
+	if req.BeforeID != nil {
+		if req.OrderDirAsc {
+			query += fmt.Sprintf(" AND id > $%d", argN)
+		} else {
+			query += fmt.Sprintf(" AND id < $%d", argN)
+		}
+		args = append(args, req.BeforeID)
+		argN++
+	}
 
 	if req.Filter != nil {
 		if len(req.Filter.Exchanges) > 0 {
@@ -257,9 +268,9 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 		}
 	}
 
-	orderQuery := " ORDER BY DESC"
+	orderQuery := " ORDER BY id DESC"
 	if req.OrderDirAsc {
-		orderQuery = "ORDER BY ASC"
+		orderQuery = " ORDER BY id ASC"
 	}
 	query += orderQuery
 
@@ -268,7 +279,7 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 
 	q := r.qp.Get(ctx)
 
-	rows, err := q.Query(ctx, query, args)
+	rows, err := q.Query(ctx, query, args...)
 	if err != nil {
 		return run.RunsPagedResponse{}, fmt.Errorf("runs paged: %w", errors.Join(errorsx.ErrInternal, err))
 	}
@@ -287,7 +298,6 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 			&res.Detector.Code,
 			&res.Detector.Version,
 			&res.Detector.OptsLabel,
-			&res.Detector.Code,
 			&res.Detector.Opts,
 			&res.FirstCandleTime,
 			&res.LastCandleTime,

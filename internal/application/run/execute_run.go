@@ -93,7 +93,7 @@ func (s *Application) executeRun(r run.Run, detector detect.CandleDetector, fees
 	signalsCount := int64(len(res.signals))
 	r.FirstCandleTime = fromBound
 	r.LastCandleTime = toBound
-	r.SignalsCount = &signalsCount
+	r.SignalsCount = signalsCount
 	r.AvgProfitPPM = &res.avgProfitPPM
 
 	zipPath := s.runZipPath(r.ID)
