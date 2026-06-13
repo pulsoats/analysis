@@ -31,7 +31,7 @@ func newRunFromRequestPb(req *analysispb.NewRunRequest) (run.NewRunRequest, erro
 		return run.NewRunRequest{}, fmt.Errorf("interval %v: %w", req.Interval, errorsx.ErrInvalidArgument)
 	}
 
-	detector, err := detectorConfigFromPb(req.DetectorConfig)
+	detector, err := detectorConfigFromProto(req.DetectorConfig)
 	if err != nil {
 		return run.NewRunRequest{}, err
 	}
@@ -46,11 +46,11 @@ func newRunFromRequestPb(req *analysispb.NewRunRequest) (run.NewRunRequest, erro
 		From:     req.From.AsTime(),
 		To:       req.To.AsTime(),
 		Detector: detector,
-		Fees:     feesFromPb(req.Fees),
+		Fees:     feesFromProto(req.Fees),
 	}, nil
 }
 
-func detectorConfigFromPb(rawDetector *corepb.DetectorConfig) (detect.DetectorConfig, error) {
+func detectorConfigFromProto(rawDetector *corepb.DetectorConfig) (detect.DetectorConfig, error) {
 	if rawDetector == nil {
 		return detect.DetectorConfig{}, errorsx.ErrInvalidArgument
 	}
@@ -66,7 +66,7 @@ func detectorConfigFromPb(rawDetector *corepb.DetectorConfig) (detect.DetectorCo
 	}, nil
 }
 
-func detectorConfigToPb(det detect.DetectorConfig) *corepb.DetectorConfig {
+func detectorConfigToProto(det detect.DetectorConfig) *corepb.DetectorConfig {
 	return &corepb.DetectorConfig{
 		Code:      det.Code,
 		Version:   det.Version,
@@ -75,7 +75,7 @@ func detectorConfigToPb(det detect.DetectorConfig) *corepb.DetectorConfig {
 	}
 }
 
-func feesFromPb(f *corepb.Fees) *market.TakerMakerFees {
+func feesFromProto(f *corepb.Fees) *market.TakerMakerFees {
 	if f == nil {
 		return nil
 	}
@@ -85,7 +85,7 @@ func feesFromPb(f *corepb.Fees) *market.TakerMakerFees {
 	}
 }
 
-func runToPb(r run.Run) *analysispb.Run {
+func runToProto(r run.Run) *analysispb.Run {
 	runPb := &analysispb.Run{
 		BaseRun: &corepb.BaseRun{
 			Id: r.ID.String(),
@@ -93,9 +93,9 @@ func runToPb(r run.Run) *analysispb.Run {
 				Code:    corepb.RunStatusCode(r.Status.Code),
 				Message: r.Status.Message,
 			},
-			Market:   marketSpecToPb(r.Market),
+			Market:   marketSpecToProto(r.Market),
 			Interval: r.Interval.String(),
-			Detector: detectorConfigToPb(r.Detector),
+			Detector: detectorConfigToProto(r.Detector),
 			SignalsCount: r.SignalsCount,
 			CreatedBy: r.CreatedBy,
 			CreatedAt: timestamppb.New(r.CreatedAt),
@@ -122,7 +122,7 @@ func runToPb(r run.Run) *analysispb.Run {
 	return runPb
 }
 
-func runScopeFromPb(pb analysispb.RunScope) run.Scope {
+func runScopeFromProto(pb analysispb.RunScope) run.Scope {
 	switch pb {
 	case analysispb.RunScope_RUN_SCOPE_SHARED:
 		return run.ScopeShared
@@ -133,7 +133,7 @@ func runScopeFromPb(pb analysispb.RunScope) run.Scope {
 	}
 }
 
-func runFilterFromPb(pb *analysispb.ListRunsFilter) (*run.Filter, error) {
+func runFilterFromProto(pb *analysispb.ListRunsFilter) (*run.Filter, error) {
 	if pb == nil {
 		return nil, nil
 	}
@@ -201,7 +201,7 @@ func runFilterFromPb(pb *analysispb.ListRunsFilter) (*run.Filter, error) {
 	}, nil
 }
 
-func listRunsPagedRequestFromPb(pb *analysispb.ListRunsPagedRequest) (run.RunsPagedRequest, error) {
+func listRunsPagedRequestFromProto(pb *analysispb.ListRunsPagedRequest) (run.RunsPagedRequest, error) {
 	var beforeID *uuid.UUID
 	if pb.BeforeId != nil {
 		id, err := uuid.Parse(*pb.BeforeId)
@@ -211,9 +211,9 @@ func listRunsPagedRequestFromPb(pb *analysispb.ListRunsPagedRequest) (run.RunsPa
 		beforeID = &id
 	}
 
-	scope := runScopeFromPb(pb.Scope)
+	scope := runScopeFromProto(pb.Scope)
 
-	filter, err := runFilterFromPb(pb.Filter)
+	filter, err := runFilterFromProto(pb.Filter)
 	if err != nil {
 		return run.RunsPagedRequest{}, err
 	}
@@ -227,10 +227,10 @@ func listRunsPagedRequestFromPb(pb *analysispb.ListRunsPagedRequest) (run.RunsPa
 	}, nil
 }
 
-func listRunsPagedResponseToPb(resp run.RunsPagedResponse) *analysispb.ListRunsPagedResponse {
+func listRunsPagedResponseToProto(resp run.RunsPagedResponse) *analysispb.ListRunsPagedResponse {
 	runs := make([]*analysispb.Run, 0, len(resp.Runs))
 	for _, r := range resp.Runs {
-		runs = append(runs, runToPb(r))
+		runs = append(runs, runToProto(r))
 	}
 
 	var nextBeforeIDStr *string
@@ -246,7 +246,7 @@ func listRunsPagedResponseToPb(resp run.RunsPagedResponse) *analysispb.ListRunsP
 	}
 }
 
-func marketSpecToPb(spec market.Spec) *corepb.MarketSpec {
+func marketSpecToProto(spec market.Spec) *corepb.MarketSpec {
 	return &corepb.MarketSpec{
 		Exchange: spec.Exchange,
 		Category: spec.Category,

@@ -57,7 +57,7 @@ func (s *Server) NewRun(ctx context.Context, req *analysispb.NewRunRequest) (*an
 		return nil, err
 	}
 
-	return runToPb(r), nil
+	return runToProto(r), nil
 }
 
 // GetRun — unary. Ошибки логирует interceptor.
@@ -80,7 +80,7 @@ func (s *Server) GetRun(ctx context.Context, req *corepb.RunID) (*analysispb.Run
 		return nil, err
 	}
 
-	return runToPb(r), nil
+	return runToProto(r), nil
 }
 
 // GetRunArchive — streaming. Конвертацию ошибок делает StreamError interceptor.
@@ -124,19 +124,19 @@ func (s *Server) ListRunsPaged(ctx context.Context, req *analysispb.ListRunsPage
 		return nil, status.Error(codes.Internal, "missing user-id in ctx")
 	}
 
-	reqFromPb, err := listRunsPagedRequestFromPb(req)
+	reqFromProto, err := listRunsPagedRequestFromProto(req)
 	if err != nil {
 		return nil, err
 	}
 
-	reqFromPb.UserID = userID
+	reqFromProto.UserID = userID
 
-	runsResp, err := s.app.RunsPaged(ctx, reqFromPb)
+	runsResp, err := s.app.RunsPaged(ctx, reqFromProto)
 	if err != nil {
 		return nil, err
 	}
 
-	return listRunsPagedResponseToPb(runsResp), nil
+	return listRunsPagedResponseToProto(runsResp), nil
 }
 
 func (s *Server) ShareRun(ctx context.Context, req *corepb.RunID) (*emptypb.Empty, error) {
