@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
-	github.com/pulsoats/contracts v1.12.1
+	github.com/pulsoats/contracts v1.12.2
 	github.com/pulsoats/core v1.15.5
 	github.com/pulsoats/detectors v0.0.0-20260612144615-7877cb64e8bc
 	github.com/rs/zerolog v1.35.1
