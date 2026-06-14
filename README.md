@@ -101,7 +101,8 @@ GITHUB_TOKEN=... docker compose up --build
 - `exchange`, `category`, `symbol`, `interval` — рынок и таймфрейм;
 - `detector_code`, `detector_label`, `detector_opts` — конфигурация детектора;
 - `first_candle_time`, `last_candle_time` — фактические границы свечей;
-- `signals_count`, `avg_profit_ppm` — агрегированный результат;
+- `signals_count`, `avg_profit_ppm`, `sum_profit_ppm` — агрегированный результат;
+- `taker_fee_ppm`, `maker_fee_ppm` — комиссии прогона;
 - `created_by`, `is_shared`, `shared_at` — владелец и публикация.
 
 Primary key `analysis.candles`:
