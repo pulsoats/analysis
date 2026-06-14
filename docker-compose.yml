@@ -18,7 +18,7 @@ services:
       - analysis-data:/data
       - ${CERTS_DIR:-./certs}:/run/certs:ro
     healthcheck:
-      test: ["CMD-SHELL", "grpc_health_probe -addr=:50051 -tls -tls-ca-cert=/run/certs/ca.crt -tls-client-cert=/run/certs/analysis.crt -tls-client-key=/run/certs/analysis.key 2>/dev/null || exit 1"]
+      test: ["CMD-SHELL", "grpc_health_probe -addr=:50051 -tls -tls-ca-cert=/run/certs/ca.pem -tls-client-cert=/run/certs/cert.pem -tls-client-key=/run/certs/key.pem 2>/dev/null || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
