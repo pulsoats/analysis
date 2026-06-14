@@ -35,7 +35,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
     fi; \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
         -ldflags "-X main.version=$(git describe --tags --always --dirty)" \
-        -o /out/analysis-app ./cmd/analysis; \
+        -o /out/analysis-app ./cmd; \
     rm -f /root/.netrc
 
 FROM debian:bookworm-slim
