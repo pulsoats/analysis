@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.6
 
-FROM golang:1.25.3 AS builder
+FROM golang:1.26.2 AS builder
 
 ENV GOPRIVATE=github.com/pulsoats/* \
     GONOSUMDB=github.com/pulsoats/* \
