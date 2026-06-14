@@ -16,6 +16,7 @@ services:
         required: false
     volumes:
       - analysis-data:/data
+      - ${CERTS_DIR:-./certs}:/run/certs:ro
     healthcheck:
       test: ["CMD-SHELL", "grpc_health_probe -addr=:50051 2>/dev/null || exit 1"]
       interval: 10s
