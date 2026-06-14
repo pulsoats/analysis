@@ -24,6 +24,7 @@ type processRunRequest struct {
 
 type processRunResult struct {
 	signals      []signal.AnalysisSignal
+	sumProfitPPM int64
 	avgProfitPPM int64
 }
 
@@ -87,6 +88,7 @@ func (s *Application) processResult(ctx context.Context, req processRunRequest) 
 	}
 	return processRunResult{
 		signals:      res,
+		sumProfitPPM: sumProfit,
 		avgProfitPPM: avg,
 	}, nil
 }

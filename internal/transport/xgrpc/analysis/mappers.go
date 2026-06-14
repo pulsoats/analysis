@@ -10,7 +10,6 @@ import (
 	corepb "github.com/pulsoats/contracts/gen/go/core/v1"
 	"github.com/pulsoats/core/detect"
 	"github.com/pulsoats/core/errorsx"
-	"github.com/pulsoats/core/lib/units"
 	"github.com/pulsoats/core/market"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -80,8 +79,15 @@ func feesFromProto(f *corepb.Fees) *market.TakerMakerFees {
 		return nil
 	}
 	return &market.TakerMakerFees{
-		TakerFeeRate: f.TakerFee,
-		MakerFeeRate: f.MakerFee,
+		TakerFeeRate: f.TakerFeePpm,
+		MakerFeeRate: f.MakerFeePpm,
+	}
+}
+
+func feesToProto(f market.TakerMakerFees) *corepb.Fees {
+	return &corepb.Fees{
+		TakerFeePpm: f.TakerFeeRate,
+		MakerFeePpm: f.MakerFeeRate,
 	}
 }
 
@@ -100,14 +106,19 @@ func runToProto(r run.Run) *analysispb.Run {
 			CreatedBy: r.CreatedBy,
 			CreatedAt: timestamppb.New(r.CreatedAt),
 		},
-		AvgProfitPercent: func() float64 {
+		SumProfitPpm: func() int64 {
+			if r.SumProfitPPM == nil {
+				return 0
+			}
+			return *r.SumProfitPPM
+		}(),
+		AvgProfitPpm: func() int64 {
 			if r.AvgProfitPPM == nil {
 				return 0
 			}
-
-			v := float64(*r.AvgProfitPPM) / float64(units.PPM) * 100
-			return v
+			return *r.AvgProfitPPM
 		}(),
+		Fees: feesToProto(r.Fees),
 	}
 	if !r.FirstCandleTime.IsZero() {
 		runPb.BaseRun.FirstCandleTime = timestamppb.New(r.FirstCandleTime)
@@ -154,12 +165,12 @@ func runFilterFromProto(pb *analysispb.ListRunsFilter) (*run.Filter, error) {
 	}
 
 	var minAvgProfitPPM, maxAvgProfitPPM *int64
-	if pb.MinAvgProfit != nil {
-		v := int64(*pb.MinAvgProfit*float64(units.PPM)) / 100
+	if pb.MinAvgProfitPpm != nil {
+		v := pb.GetMinAvgProfitPpm()
 		minAvgProfitPPM = &v
 	}
-	if pb.MaxAvgProfit != nil {
-		v := int64(*pb.MaxAvgProfit*float64(units.PPM)) / 100
+	if pb.MaxAvgProfitPpm != nil {
+		v := pb.GetMaxAvgProfitPpm()
 		maxAvgProfitPPM = &v
 	}
 

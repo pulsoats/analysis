@@ -14,9 +14,12 @@ CREATE TABLE IF NOT EXISTS analysis.runs
     first_candle_time TIMESTAMPTZ NOT NULL,
     last_candle_time  TIMESTAMPTZ NOT NULL,
     signals_count     BIGINT               DEFAULT 0,
+    sum_profit_ppm    BIGINT,
     avg_profit_ppm    BIGINT,
     created_by        TEXT        NOT NULL,
     created_at        TIMESTAMPTZ          DEFAULT NOW(),
+    taker_fee_ppm     BIGINT      NOT NULL,
+    maker_fee_ppm     BIGINT      NOT NULL,
     is_shared         BOOLEAN     NOT NULL DEFAULT FALSE,
     shared_at         TIMESTAMPTZ
 );

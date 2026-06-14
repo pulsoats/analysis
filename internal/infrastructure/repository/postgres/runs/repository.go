@@ -26,9 +26,10 @@ func (r *repo) CreateRun(ctx context.Context, run *run.Run) error {
 		INSERT INTO analysis.runs (
 			id, exchange, category, symbol, interval,
 			detector_code, detector_version, detector_label, detector_opts,
-			first_candle_time, last_candle_time, status_code, status_message, created_by
+			first_candle_time, last_candle_time, status_code, status_message, created_by,
+			taker_fee_ppm, maker_fee_ppm
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
 		RETURNING created_at;
 	`
 
@@ -49,6 +50,8 @@ func (r *repo) CreateRun(ctx context.Context, run *run.Run) error {
 		run.Status.Code,
 		run.Status.Message,
 		run.CreatedBy,
+		run.Fees.TakerFeeRate,
+		run.Fees.MakerFeeRate,
 	).Scan(&run.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("create run: %w", errors.Join(errorsx.ErrInternal, err))
@@ -64,9 +67,10 @@ func (r *repo) UpdateRun(ctx context.Context, res run.Run) error {
 		    first_candle_time      = $4,
 		    last_candle_time        = $5,
 		    signals_count  = $6,
-		    avg_profit_ppm = $7,
-		    is_shared      = $8,
-		    shared_at      = $9
+		    sum_profit_ppm = $7,
+		    avg_profit_ppm = $8,
+		    is_shared      = $9,
+		    shared_at      = $10
 		WHERE id = $1;
 	`
 
@@ -79,6 +83,7 @@ func (r *repo) UpdateRun(ctx context.Context, res run.Run) error {
 		res.FirstCandleTime,
 		res.LastCandleTime,
 		res.SignalsCount,
+		res.SumProfitPPM,
 		res.AvgProfitPPM,
 		res.IsShared,
 		res.SharedAt,
@@ -97,7 +102,8 @@ func (r *repo) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
 		SELECT
 			id, exchange, category, symbol, interval,
 			detector_code, detector_version, detector_label, detector_opts,
-			first_candle_time, last_candle_time, signals_count, avg_profit_ppm,
+			first_candle_time, last_candle_time, signals_count, sum_profit_ppm, avg_profit_ppm,
+			taker_fee_ppm, maker_fee_ppm,
 			created_by, created_at, status_code, status_message, is_shared, shared_at
 		FROM analysis.runs
 		WHERE id = $1;
@@ -120,7 +126,10 @@ func (r *repo) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
 		&res.FirstCandleTime,
 		&res.LastCandleTime,
 		&res.SignalsCount,
+		&res.SumProfitPPM,
 		&res.AvgProfitPPM,
+		&res.Fees.TakerFeeRate,
+		&res.Fees.MakerFeeRate,
 		&res.CreatedBy,
 		&res.CreatedAt,
 		&res.Status.Code,
@@ -145,7 +154,8 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 	SELECT
     	id, exchange, category, symbol, interval,
 		detector_code, detector_version, detector_label, detector_opts,
-		first_candle_time, last_candle_time, signals_count, avg_profit_ppm,
+		first_candle_time, last_candle_time, signals_count, sum_profit_ppm, avg_profit_ppm,
+		taker_fee_ppm, maker_fee_ppm,
 		created_by, created_at, status_code, status_message, is_shared, shared_at
 	FROM analysis.runs
 	WHERE 1 = 1`
@@ -302,7 +312,10 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 			&res.FirstCandleTime,
 			&res.LastCandleTime,
 			&res.SignalsCount,
+			&res.SumProfitPPM,
 			&res.AvgProfitPPM,
+			&res.Fees.TakerFeeRate,
+			&res.Fees.MakerFeeRate,
 			&res.CreatedBy,
 			&res.CreatedAt,
 			&res.Status.Code,
