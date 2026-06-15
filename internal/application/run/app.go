@@ -84,6 +84,18 @@ func NewApplication(cfg Config) (*Application, error) {
 }
 
 func (s *Application) NewRun(ctx context.Context, req run.NewRunRequest) (run.Run, error) {
+	s.log.Info("new run requested",
+		"user_id", req.UserID,
+		"exchange", req.Market.Exchange,
+		"category", req.Market.Category,
+		"symbol", req.Market.Symbol,
+		"interval", req.Interval,
+		"detector", req.Detector.Code,
+		"detector_version", req.Detector.Version,
+		"from", req.From,
+		"to", req.To,
+	)
+
 	if req.UserID == "" {
 		return run.Run{}, fmt.Errorf("new run: user_id: %w", errorsx.ErrRequired)
 	}
@@ -105,6 +117,14 @@ func (s *Application) NewRun(ctx context.Context, req run.NewRunRequest) (run.Ru
 
 	exClient, ok := s.exchanges[req.Market.Exchange]
 	if !ok {
+		available := make([]string, 0, len(s.exchanges))
+		for k := range s.exchanges {
+			available = append(available, k)
+		}
+		s.log.Warn("new run: exchange not registered",
+			"requested_exchange", req.Market.Exchange,
+			"available_exchanges", available,
+		)
 		return run.Run{}, fmt.Errorf("new run: exchange %s: %w", req.Market.Exchange, errorsx.ErrNotFound)
 	}
 
