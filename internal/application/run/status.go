@@ -40,7 +40,7 @@ func signalStatus(req signalStatusRequest) (signalStatusResponse, error) {
 
 	for i := 0; i < limitBuy; i++ {
 		c := req.BarsForTrade[i]
-		if c.High >= req.Signal.BuyValue {
+		if c.Low <= req.Signal.BuyValue && c.High >= req.Signal.BuyValue {
 			buyIndex = i
 			resp.BuyTime = c.Time
 			break
