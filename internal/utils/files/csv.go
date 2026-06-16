@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"slices"
-	"strconv"
 	"time"
 
 	"github.com/pulsoats/analysis/internal/domain/signal"
@@ -68,32 +67,17 @@ func BuildCandlesCSV(ctx context.Context, w io.Writer, candles []market.Candle) 
 	return cw.Close()
 }
 
-func encodeAnalysisSignal(runID string, sig signal.AnalysisSignal) []string {
-	timeStr := time.UnixMilli(sig.CandleTime).UTC().Format(time.RFC3339)
-
-	profitability := float64(sig.ExpectedReturnPPM) / 10_000
-
-	return []string{
-		sig.ID.String(),
-		runID,
+func encodeAnalysisSignal(_ string, sig signal.AnalysisSignal) []string {
+	rows := corecsv.EncodeSignal(sig.Signal)
+	rows = append(rows,
 		sig.Status,
-		sig.DetectorCode,
-		sig.DetectorOptsLabel,
-		timeStr,
-		format.CentsToString(sig.CandleValue),
-		format.CentsToString(sig.BuyValue),
 		time.UnixMilli(sig.BuyTime).UTC().Format(time.RFC3339),
-		format.CentsToString(sig.TakeProfitValue),
-		format.CentsToString(sig.StopLossValue),
 		time.UnixMilli(sig.SellTime).UTC().Format(time.RFC3339),
-		strconv.FormatFloat(profitability, 'f', 4, 64) + "%",
-		time.UnixMilli(sig.Extremes[0].Time).UTC().Format(time.RFC3339),
-		format.CentsToString(sig.Extremes[0].Close),
-		time.UnixMilli(sig.Extremes[1].Time).UTC().Format(time.RFC3339),
-		format.CentsToString(sig.Extremes[1].Close),
-		time.UnixMilli(sig.Extremes[2].Time).UTC().Format(time.RFC3339),
-		format.CentsToString(sig.Extremes[2].Close),
-	}
+		time.UnixMilli(sig.LeftMinTime).UTC().Format(time.RFC3339),
+		time.UnixMilli(sig.MaxTime).UTC().Format(time.RFC3339),
+		time.UnixMilli(sig.RightMinTime).UTC().Format(time.RFC3339),
+	)
+	return rows
 }
 
 func encodeCandle(candle market.Candle) []string {
