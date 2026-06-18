@@ -16,7 +16,7 @@ import (
 	"github.com/pulsoats/core/market"
 )
 
-func BuildSignalsCSV(ctx context.Context, w io.Writer, runID string, signals []signal.AnalysisSignal) error {
+func BuildSignalsCSV(ctx context.Context, w io.Writer, runID string, spec market.Spec, interval market.Interval, signals []signal.AnalysisSignal) error {
 	const op = "build signals csv"
 	if len(signals) == 0 {
 		return nil
@@ -29,7 +29,7 @@ func BuildSignalsCSV(ctx context.Context, w io.Writer, runID string, signals []s
 	sw, err := corecsv.NewWriter[signal.AnalysisSignal](
 		w,
 		func(sig signal.AnalysisSignal) []string {
-			return encodeAnalysisSignal(runID, sig)
+			return encodeAnalysisSignal(runID, spec, interval, sig)
 		},
 		corecsv.WithHeader(corecsv.CreateHeaders(signal.AnalysisSignal{})),
 	)
@@ -67,8 +67,8 @@ func BuildCandlesCSV(ctx context.Context, w io.Writer, candles []market.Candle) 
 	return cw.Close()
 }
 
-func encodeAnalysisSignal(_ string, sig signal.AnalysisSignal) []string {
-	rows := corecsv.EncodeSignal(sig.Signal)
+func encodeAnalysisSignal(_ string, spec market.Spec, interval market.Interval, sig signal.AnalysisSignal) []string {
+	rows := corecsv.EncodeSignal(sig.Signal, spec, interval)
 	rows = append(rows,
 		sig.Status,
 		time.UnixMilli(sig.BuyTime).UTC().Format(time.RFC3339),

@@ -62,7 +62,7 @@ func BuildZipResult(ctx context.Context, zipPath string, run run.Run, candles []
 	if err != nil {
 		return fmt.Errorf("build zip result: add signals entry: %w", errors.Join(errorsx.ErrInternal, err))
 	}
-	if err := BuildSignalsCSV(ctx, sw, run.ID.String(), signals); err != nil {
+	if err := BuildSignalsCSV(ctx, sw, run.ID.String(), run.Market, run.Interval, signals); err != nil {
 		return fmt.Errorf("build zip result: signals csv: %w", err)
 	}
 

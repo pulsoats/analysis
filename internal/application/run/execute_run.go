@@ -71,7 +71,6 @@ func (s *Application) executeRun(r run.Run, detector detect.CandleDetector, fees
 		if !ok {
 			continue
 		}
-		sig.Interval = r.Interval
 		as := signal.AnalysisSignal{Signal: sig, Index: i}
 		if len(sig.Extremes) == 3 {
 			as.LeftMinTime = sig.Extremes[0].Time
