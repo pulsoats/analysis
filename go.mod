@@ -6,7 +6,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/pulsoats/contracts v1.13.0
-	github.com/pulsoats/core v1.15.7
+	github.com/pulsoats/core v1.15.8
 	github.com/pulsoats/detectors v0.0.0-20260618092351-8ca7b81f11d0
 	github.com/rs/zerolog v1.35.1
 	golang.org/x/sync v0.20.0
