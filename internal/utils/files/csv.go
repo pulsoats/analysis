@@ -31,7 +31,14 @@ func BuildSignalsCSV(ctx context.Context, w io.Writer, runID string, spec market
 		func(sig signal.AnalysisSignal) []string {
 			return encodeAnalysisSignal(runID, spec, interval, sig)
 		},
-		corecsv.WithHeader(corecsv.CreateHeaders(signal.AnalysisSignal{})),
+		corecsv.WithHeader([]string{
+			"ID", "RunID",
+			"Exchange", "Category", "Symbol", "Interval",
+			"DetectorCode", "DetectorVersion", "DetectorOptsLabel",
+			"CandleTime", "CandleValue", "BuyValue", "TakeProfitValue", "StopLossValue",
+			"ExpectedReturnPPM", "CreatedAt",
+			"Status", "BuyTime", "SellTime", "LeftMinTime", "MaxTime", "RightMinTime",
+		}),
 	)
 	if err != nil {
 		return fmt.Errorf("%s: new writer: %w", op, errors.Join(errorsx.ErrInternal, err))
