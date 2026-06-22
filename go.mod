@@ -7,7 +7,7 @@ require (
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/pulsoats/contracts v1.13.0
 	github.com/pulsoats/core v1.15.8
-	github.com/pulsoats/detectors v0.0.0-20260618212915-8dd178535c2b
+	github.com/pulsoats/detectors v0.0.0-20260622130903-aab353b3da49
 	github.com/rs/zerolog v1.35.1
 	golang.org/x/sync v0.20.0
 	google.golang.org/grpc v1.80.0
