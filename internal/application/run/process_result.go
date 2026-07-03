@@ -109,7 +109,7 @@ func (s *Application) processResult(ctx context.Context, req processRunRequest) 
 func checkLookBackByLow(lookBackBars []market.Candle, lowestLowInWindow int64) bool {
 	lowestLookBackLow := int64(math.MinInt64)
 	for i := 0; i < len(lookBackBars); i++ {
-		if lookBackBars[i].Low > lowestLowInWindow {
+		if lookBackBars[i].Low > lowestLookBackLow {
 			lowestLookBackLow = lookBackBars[i].Low
 		}
 	}
