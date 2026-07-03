@@ -61,6 +61,9 @@ func (s *Application) processResult(ctx context.Context, req processRunRequest) 
 			Add(-time.Duration(req.interval) * time.Duration(req.detector.WindowSize()-1))
 
 		lookBackBars, err := s.fetchCandles(ctx, req.market, req.interval, firstWindowCandleTime.Add(-time.Duration(req.interval)*24), firstWindowCandleTime)
+		if err != nil {
+			return processRunResult{}, fmt.Errorf("process run result: fetch look back candles: %w", err)
+		}
 
 		if !checkLookBackByLow(lookBackBars, sig.StopLossValue) {
 			continue
@@ -107,7 +110,7 @@ func (s *Application) processResult(ctx context.Context, req processRunRequest) 
 }
 
 func checkLookBackByLow(lookBackBars []market.Candle, lowestLowInWindow int64) bool {
-	lowestLookBackLow := int64(math.MinInt64)
+	lowestLookBackLow := int64(math.MaxInt64)
 	for i := 0; i < len(lookBackBars); i++ {
 		if lookBackBars[i].Low < lowestLookBackLow {
 			lowestLookBackLow = lookBackBars[i].Low
