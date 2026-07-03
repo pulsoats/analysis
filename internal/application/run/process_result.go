@@ -117,7 +117,7 @@ func checkLookBackByLow(lookBackBars []market.Candle, lowestLowInWindow int64) b
 		}
 	}
 
-	if lowestLookBackLow < lowestLowInWindow {
+	if lowestLookBackLow > lowestLowInWindow {
 		return false
 	}
 
