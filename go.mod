@@ -6,8 +6,8 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.9.2
 	github.com/pulsoats/contracts v1.13.0
-	github.com/pulsoats/core v1.16.3
-	github.com/pulsoats/detectors v0.0.0-20260705180917-6a91be5b8d41
+	github.com/pulsoats/core v1.15.8
+	github.com/pulsoats/detectors v0.0.0-20260703184710-f5cbfd07081d
 	github.com/rs/zerolog v1.35.1
 	golang.org/x/sync v0.20.0
 	google.golang.org/grpc v1.80.0
@@ -15,7 +15,7 @@ require (
 )
 
 require (
-	github.com/coder/websocket v1.8.15 // indirect
+	github.com/coder/websocket v1.8.14 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect

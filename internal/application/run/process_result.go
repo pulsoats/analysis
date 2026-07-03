@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/google/uuid"
@@ -56,6 +57,15 @@ func (s *Application) processResult(ctx context.Context, req processRunRequest) 
 		windowLen := barsForBuy + barsForSell
 		to := from.Add(time.Duration(windowLen) * time.Duration(minTF))
 
+		firstWindowCandleTime := time.UnixMilli(sig.CandleTime).
+			Add(-time.Duration(req.interval) * time.Duration(req.detector.WindowSize()-1))
+
+		lookBackBars, err := s.fetchCandles(ctx, req.market, req.interval, firstWindowCandleTime.Add(-time.Duration(req.interval)*24), firstWindowCandleTime)
+
+		if !checkLookBackByLow(lookBackBars, sig.StopLossValue) {
+			continue
+		}
+
 		tradeWindow, err := s.fetchCandles(ctx, req.market, minTF, from, to)
 		if err != nil {
 			return processRunResult{}, fmt.Errorf("process run result: fetch candles: %w", err)
@@ -94,4 +104,19 @@ func (s *Application) processResult(ctx context.Context, req processRunRequest) 
 		sumProfitPPM: sumProfit,
 		avgProfitPPM: avg,
 	}, nil
+}
+
+func checkLookBackByLow(lookBackBars []market.Candle, lowestLowInWindow int64) bool {
+	lowestLookBackLow := int64(math.MinInt64)
+	for i := 0; i < len(lookBackBars); i++ {
+		if lookBackBars[i].Low > lowestLowInWindow {
+			lowestLookBackLow = lookBackBars[i].Low
+		}
+	}
+
+	if lowestLookBackLow < lowestLowInWindow {
+		return false
+	}
+
+	return true
 }
