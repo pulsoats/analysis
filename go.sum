@@ -33,8 +33,8 @@ github.com/pulsoats/contracts v1.13.0 h1:kfmDP8fPDjMgc5TZNrD3VEUwVq/dLJ1zTrP4zvv
 github.com/pulsoats/contracts v1.13.0/go.mod h1:tALJFOoAijHLIKzqkTYDbVEou0fmUqfUWSsvxGS1XOU=
 github.com/pulsoats/core v1.15.8 h1:lQ8DMhpOPN3XN9JtkLYSuFBYzQVN9xaMfV59/eSMUB8=
 github.com/pulsoats/core v1.15.8/go.mod h1:6yUNEmr/1UyDDIKzeTo/80BjTYUdD3YK2OJK8hMGG5g=
-github.com/pulsoats/detectors v0.0.0-20260622130903-aab353b3da49 h1:raILYfNxybQM88SlJPXIXhaszp/bVI1Z0xUeXoLga6U=
-github.com/pulsoats/detectors v0.0.0-20260622130903-aab353b3da49/go.mod h1:G4MmP6qwLWdSHHVsuYgzUiYLsgPpT+6Mko+TFUfqrLM=
+github.com/pulsoats/detectors v0.0.0-20260703124901-18950a17ac27 h1:5h1px+RNMU2uTrVDZa3MsK5PXW/avMMsuND574jq4rk=
+github.com/pulsoats/detectors v0.0.0-20260703124901-18950a17ac27/go.mod h1:G4MmP6qwLWdSHHVsuYgzUiYLsgPpT+6Mko+TFUfqrLM=
 github.com/rs/zerolog v1.35.1 h1:m7xQeoiLIiV0BCEY4Hs+j2NG4Gp2o2KPKmhnnLiazKI=
 github.com/rs/zerolog v1.35.1/go.mod h1:EjML9kdfa/RMA7h/6z6pYmq1ykOuA8/mjWaEvGI+jcw=
 github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+wExME=
