@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -38,7 +39,7 @@ func newRunFromRequestPb(req *analysispb.NewRunRequest) (run.NewRunRequest, erro
 	return run.NewRunRequest{
 		Market: market.Spec{
 			Exchange: req.Market.Exchange,
-			Category: req.Market.Category,
+			Category: strings.ToLower(req.Market.Category),
 			Symbol:   req.Market.Symbol,
 		},
 		Interval: interval,
@@ -194,9 +195,14 @@ func runFilterFromProto(pb *analysispb.ListRunsFilter) (*run.Filter, error) {
 		createdTo = &v
 	}
 
+	categories := make([]string, len(pb.Categories))
+	for i, c := range pb.Categories {
+		categories[i] = strings.ToLower(c)
+	}
+
 	return &run.Filter{
 		Exchanges:       pb.Exchanges,
-		Categories:      pb.Categories,
+		Categories:      categories,
 		Symbols:         pb.Symbols,
 		Intervals:       pb.Intervals,
 		DetectorCodes:   pb.DetectorCodes,
