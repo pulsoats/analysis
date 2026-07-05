@@ -71,17 +71,12 @@ func (s *Application) executeRun(r run.Run, detector detect.CandleDetector, fees
 		if !ok {
 			continue
 		}
-		as := signal.AnalysisSignal{Signal: sig, Index: i}
-		if len(sig.Extremes) == 3 {
-			as.LeftMinTime = sig.Extremes[0].Time
-			as.MaxTime = sig.Extremes[1].Time
-			as.RightMinTime = sig.Extremes[2].Time
-		}
-		signals = append(signals, as)
+		signals = append(signals, signal.AnalysisSignal{Signal: sig, Index: i})
 	}
 	log.Debug("signals detected", "count", len(signals))
 
 	res, err := s.processResult(ctx, processRunRequest{
+		runID:    r.ID,
 		signals:  signals,
 		candles:  candles,
 		detector: detector,

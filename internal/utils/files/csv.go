@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"sort"
 	"time"
 
 	"github.com/pulsoats/analysis/internal/domain/signal"
@@ -23,23 +24,24 @@ func BuildSignalsCSV(ctx context.Context, w io.Writer, runID string, spec market
 	}
 
 	slices.SortFunc(signals, func(a, b signal.AnalysisSignal) int {
-		return int(a.CandleTime - b.CandleTime)
+		return a.CandleTime.Compare(b.CandleTime)
 	})
+
+	var metadataColumns []string
+	for k, _ := range signals[0].Metadata {
+		metadataColumns = append(metadataColumns, k)
+	}
+	sort.Strings(metadataColumns)
+
+	header := corecsv.CreateHeaders(signal.AnalysisSignal{})
+	header = append(header, metadataColumns...)
 
 	sw, err := corecsv.NewWriter[signal.AnalysisSignal](
 		w,
 		func(sig signal.AnalysisSignal) []string {
-			return encodeAnalysisSignal(runID, spec, interval, sig)
+			return encodeAnalysisSignal(metadataColumns, sig)
 		},
-		corecsv.WithHeader([]string{
-			"ID", "RunID",
-			"Exchange", "Category", "Symbol", "Interval",
-			"DetectorCode", "DetectorVersion", "DetectorOptsLabel",
-			"CandleTime", "CandleValue", "BuyValue", "TakeProfitValue", "StopLossValue",
-			"ExpectedReturnPPM", "CreatedAt",
-			"Status", "BuyTime", "SellTime", "LeftMinTime", "MaxTime", "RightMinTime",
-		}),
-	)
+		corecsv.WithHeader(header))
 	if err != nil {
 		return fmt.Errorf("%s: new writer: %w", op, errors.Join(errorsx.ErrInternal, err))
 	}
@@ -74,16 +76,18 @@ func BuildCandlesCSV(ctx context.Context, w io.Writer, candles []market.Candle) 
 	return cw.Close()
 }
 
-func encodeAnalysisSignal(_ string, spec market.Spec, interval market.Interval, sig signal.AnalysisSignal) []string {
-	rows := corecsv.EncodeSignal(sig.Signal, spec, interval)
+func encodeAnalysisSignal(metadataColumns []string, sig signal.AnalysisSignal) []string {
+	var metadataRows []string
+	for _, r := range metadataColumns {
+		metadataRows = append(metadataRows, sig.Metadata[r])
+	}
+	rows := corecsv.EncodeSignal(sig.Signal)
 	rows = append(rows,
 		sig.Status,
 		time.UnixMilli(sig.BuyTime).UTC().Format(time.RFC3339),
 		time.UnixMilli(sig.SellTime).UTC().Format(time.RFC3339),
-		time.UnixMilli(sig.LeftMinTime).UTC().Format(time.RFC3339),
-		time.UnixMilli(sig.MaxTime).UTC().Format(time.RFC3339),
-		time.UnixMilli(sig.RightMinTime).UTC().Format(time.RFC3339),
 	)
+	rows = append(rows, metadataRows...)
 	return rows
 }
 

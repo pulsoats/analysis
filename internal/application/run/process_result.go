@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/pulsoats/analysis/internal/domain/signal"
 	"github.com/pulsoats/core/detect"
 	"github.com/pulsoats/core/market"
@@ -14,6 +15,7 @@ import (
 const minTF = market.Interval1m
 
 type processRunRequest struct {
+	runID    uuid.UUID
 	signals  []signal.AnalysisSignal
 	candles  []market.Candle
 	detector detect.CandleDetector
@@ -74,6 +76,7 @@ func (s *Application) processResult(ctx context.Context, req processRunRequest) 
 			return processRunResult{}, fmt.Errorf("process run result: signal status: %w", err)
 		}
 
+		sig.RunID = req.runID
 		sig.Status = resp.SignalStatus
 		sig.Signal.ExpectedReturnPPM = resp.ExpectedReturnPPM
 		sig.BuyTime = resp.BuyTime
