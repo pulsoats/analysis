@@ -57,7 +57,7 @@ func (s *Application) processResult(ctx context.Context, req processRunRequest) 
 		windowLen := barsForBuy + barsForSell
 		to := from.Add(time.Duration(windowLen) * time.Duration(minTF))
 
-		firstWindowCandleTime := time.UnixMilli(sig.CandleTime).
+		firstWindowCandleTime := sig.CandleTime.
 			Add(-time.Duration(req.interval) * time.Duration(req.detector.WindowSize()-1))
 
 		lookBackBars, err := s.fetchCandles(ctx, req.market, req.interval, firstWindowCandleTime.Add(-time.Duration(req.interval)*24), firstWindowCandleTime)
