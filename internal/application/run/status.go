@@ -59,22 +59,22 @@ func signalStatus(req signalStatusRequest) (signalStatusResponse, error) {
 		end = buyIndex
 	}
 
-	hitTP := false
+	hitTP, hitSL := false, false
 	for i := buyIndex; i <= end; i++ {
 		c := req.BarsForTrade[i]
-		//		curSL := req.Signal.StopLossValue > 0 && c.Low <= req.Signal.StopLossValue
+		curSL := req.Signal.StopLossValue > 0 && c.Low <= req.Signal.StopLossValue
 		curTP := c.High >= req.Signal.TakeProfitValue
 
-		/*		if curSL && curTP {
-					hitSL = true
-					resp.SellTime = c.Time
-					break
-				}
-				if curSL {
-					hitSL = true
-					resp.SellTime = c.Time
-					break
-				}*/
+		if curSL && curTP {
+			hitSL = true
+			resp.SellTime = c.Time
+			break
+		}
+		if curSL {
+			hitSL = true
+			resp.SellTime = c.Time
+			break
+		}
 		if curTP {
 			hitTP = true
 			resp.SellTime = c.Time
@@ -85,8 +85,8 @@ func signalStatus(req signalStatusRequest) (signalStatusResponse, error) {
 	switch {
 	case hitTP:
 		resp.SignalStatus = "PROFIT"
-		//	case hitSL:
-		//		resp.SignalStatus = "LOSS"
+	case hitSL:
+		resp.SignalStatus = "LOSS"
 	default:
 		resp.SignalStatus = "UNKNOWN"
 		resp.SellTime = req.BarsForTrade[end].Time
@@ -106,8 +106,8 @@ func calcExpectedReturnPPM(sig detect.Signal, status string, lastBFSPointValue i
 	switch status {
 	case "PROFIT":
 		exitRaw = sig.TakeProfitValue
-		//	case "LOSS":
-		//		exitRaw = sig.StopLossValue
+	case "LOSS":
+		exitRaw = sig.StopLossValue
 	default:
 		exitRaw = lastBFSPointValue
 	}
