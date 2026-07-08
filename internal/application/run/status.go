@@ -14,11 +14,12 @@ var (
 )
 
 type signalStatusRequest struct {
-	BarsForTrade []market.Candle // окно после сигнала (свеча сигнала не входит)
-	Signal       detect.Signal
-	BarsForBuy   int
-	BarsForSell  int
-	Fees         market.TakerMakerFees
+	barsForTrade    []market.Candle // окно после сигнала (свеча сигнала не входит)
+	signal          detect.Signal
+	barsForBuy      int
+	barsForSell     int
+	fees            market.TakerMakerFees
+	disableStopLoss bool
 }
 
 type signalStatusResponse struct {
@@ -31,16 +32,16 @@ type signalStatusResponse struct {
 func signalStatus(req signalStatusRequest) (signalStatusResponse, error) {
 	var resp signalStatusResponse
 
-	if len(req.BarsForTrade) == 0 {
+	if len(req.barsForTrade) == 0 {
 		return signalStatusResponse{}, ErrNoData
 	}
 
 	buyIndex := -1
-	limitBuy := min(req.BarsForBuy, len(req.BarsForTrade))
+	limitBuy := min(req.barsForBuy, len(req.barsForTrade))
 
 	for i := 0; i < limitBuy; i++ {
-		c := req.BarsForTrade[i]
-		if c.Low <= req.Signal.BuyValue && c.High >= req.Signal.BuyValue {
+		c := req.barsForTrade[i]
+		if c.Low <= req.signal.BuyValue && c.High >= req.signal.BuyValue {
 			buyIndex = i
 			resp.BuyTime = c.Time
 			break
@@ -51,9 +52,9 @@ func signalStatus(req signalStatusRequest) (signalStatusResponse, error) {
 		return signalStatusResponse{}, ErrNoBuy
 	}
 
-	end := buyIndex + req.BarsForSell
-	if end > len(req.BarsForTrade)-1 {
-		end = len(req.BarsForTrade) - 1
+	end := buyIndex + req.barsForSell
+	if end > len(req.barsForTrade)-1 {
+		end = len(req.barsForTrade) - 1
 	}
 	if end < buyIndex {
 		end = buyIndex
@@ -61,16 +62,11 @@ func signalStatus(req signalStatusRequest) (signalStatusResponse, error) {
 
 	hitTP, hitSL := false, false
 	for i := buyIndex; i <= end; i++ {
-		c := req.BarsForTrade[i]
-		curSL := req.Signal.StopLossValue > 0 && c.Low <= req.Signal.StopLossValue
-		curTP := c.High >= req.Signal.TakeProfitValue
+		c := req.barsForTrade[i]
+		curSL := req.signal.StopLossValue > 0 && c.Low <= req.signal.StopLossValue
+		curTP := c.High >= req.signal.TakeProfitValue
 
-		if curSL && curTP {
-			hitSL = true
-			resp.SellTime = c.Time
-			break
-		}
-		if curSL {
+		if !req.disableStopLoss && curSL {
 			hitSL = true
 			resp.SellTime = c.Time
 			break
@@ -89,11 +85,11 @@ func signalStatus(req signalStatusRequest) (signalStatusResponse, error) {
 		resp.SignalStatus = "LOSS"
 	default:
 		resp.SignalStatus = "UNKNOWN"
-		resp.SellTime = req.BarsForTrade[end].Time
+		resp.SellTime = req.barsForTrade[end].Time
 	}
 
-	last := req.BarsForTrade[end].Close
-	resp.ExpectedReturnPPM = calcExpectedReturnPPM(req.Signal, resp.SignalStatus, last, req.Fees)
+	last := req.barsForTrade[end].Close
+	resp.ExpectedReturnPPM = calcExpectedReturnPPM(req.signal, resp.SignalStatus, last, req.fees)
 
 	return resp, nil
 }

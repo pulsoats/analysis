@@ -27,9 +27,9 @@ func (r *repo) CreateRun(ctx context.Context, run *run.Run) error {
 			id, exchange, category, symbol, interval,
 			detector_code, detector_version, detector_label, detector_opts,
 			first_candle_time, last_candle_time, status_code, status_message, created_by,
-			taker_fee_ppm, maker_fee_ppm
+			taker_fee_ppm, maker_fee_ppm, disable_stop_loss, disable_repeats
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, $17, $18)
 		RETURNING created_at;
 	`
 
@@ -52,6 +52,8 @@ func (r *repo) CreateRun(ctx context.Context, run *run.Run) error {
 		run.CreatedBy,
 		run.Fees.TakerFeeRate,
 		run.Fees.MakerFeeRate,
+		run.DisableStopLoss,
+		run.DisableRepeats,
 	).Scan(&run.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("create run: %w", errors.Join(errorsx.ErrInternal, err))
@@ -103,7 +105,7 @@ func (r *repo) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
 			id, exchange, category, symbol, interval,
 			detector_code, detector_version, detector_label, detector_opts,
 			first_candle_time, last_candle_time, signals_count, sum_profit_ppm, avg_profit_ppm,
-			taker_fee_ppm, maker_fee_ppm,
+			taker_fee_ppm, maker_fee_ppm, disable_stop_loss, disable_repeats,
 			created_by, created_at, status_code, status_message, is_shared, shared_at
 		FROM analysis.runs
 		WHERE id = $1;
@@ -130,6 +132,8 @@ func (r *repo) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
 		&res.AvgProfitPPM,
 		&res.Fees.TakerFeeRate,
 		&res.Fees.MakerFeeRate,
+		&res.DisableStopLoss,
+		&res.DisableRepeats,
 		&res.CreatedBy,
 		&res.CreatedAt,
 		&res.Status.Code,
@@ -155,7 +159,7 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
     	id, exchange, category, symbol, interval,
 		detector_code, detector_version, detector_label, detector_opts,
 		first_candle_time, last_candle_time, signals_count, sum_profit_ppm, avg_profit_ppm,
-		taker_fee_ppm, maker_fee_ppm,
+		taker_fee_ppm, maker_fee_ppm, disable_stop_loss, disable_repeats,
 		created_by, created_at, status_code, status_message, is_shared, shared_at
 	FROM analysis.runs
 	WHERE 1 = 1`
@@ -276,6 +280,18 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 			args = append(args, req.Filter.CreatedTo)
 			argN++
 		}
+
+		if req.Filter.DisableStopLoss != nil {
+			query += fmt.Sprintf(" AND disable_stop_loss = $%d", argN)
+			args = append(args, *req.Filter.DisableStopLoss)
+			argN++
+		}
+
+		if req.Filter.DisableRepeats != nil {
+			query += fmt.Sprintf(" AND disable_repeats = $%d", argN)
+			args = append(args, *req.Filter.DisableRepeats)
+			argN++
+		}
 	}
 
 	orderQuery := " ORDER BY id DESC"
@@ -316,6 +332,8 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 			&res.AvgProfitPPM,
 			&res.Fees.TakerFeeRate,
 			&res.Fees.MakerFeeRate,
+			&res.DisableStopLoss,
+			&res.DisableRepeats,
 			&res.CreatedBy,
 			&res.CreatedAt,
 			&res.Status.Code,

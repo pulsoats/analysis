@@ -22,11 +22,13 @@ const (
 // Run описывает агрегированный результат прогона исторического сервиса.
 type Run struct {
 	corerun.Base
-	Fees         market.TakerMakerFees
-	SumProfitPPM *int64
-	AvgProfitPPM *int64
-	IsShared     bool
-	SharedAt     *time.Time
+	Fees            market.TakerMakerFees
+	DisableStopLoss bool
+	DisableRepeats  bool
+	SumProfitPPM    *int64
+	AvgProfitPPM    *int64
+	IsShared        bool
+	SharedAt        *time.Time
 }
 
 func (r Run) String() string {
@@ -50,6 +52,9 @@ type Filter struct {
 	MaxSignals      *int64
 	MinAvgProfitPPM *int64 // avgProfitPPM >= / <= (перевести в PPM)
 	MaxAvgProfitPPM *int64
+
+	DisableStopLoss *bool
+	DisableRepeats  *bool
 
 	// период свечей (колонка Period = firstCandleTime → lastCandleTime)
 	FirstCandleFrom *time.Time // first_candle_time >= FirstCandleFrom

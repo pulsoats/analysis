@@ -4,10 +4,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/pulsoats/analysis/internal/domain/run"
 	"github.com/pulsoats/analysis/internal/domain/signal"
 	"github.com/pulsoats/core/detect"
 	"github.com/pulsoats/core/market"
@@ -16,13 +15,10 @@ import (
 const minTF = market.Interval1m
 
 type processRunRequest struct {
-	runID    uuid.UUID
+	run      run.Run
 	signals  []signal.AnalysisSignal
 	candles  []market.Candle
 	detector detect.CandleDetector
-	market   market.Spec
-	interval market.Interval
-	fees     market.TakerMakerFees
 }
 
 type processRunResult struct {
@@ -32,12 +28,14 @@ type processRunResult struct {
 }
 
 func (s *Application) processResult(ctx context.Context, req processRunRequest) (processRunResult, error) {
-	var (
-		sumProfit int64
-	)
+	var sumProfit int64
+	var seen map[string]struct{}
+	if req.run.DisableRepeats {
+		seen = make(map[string]struct{})
+	}
 
 	// количество свечей в минимальном TF
-	ratio := int(time.Duration(req.interval) / time.Duration(minTF))
+	ratio := int(time.Duration(req.run.Interval) / time.Duration(minTF))
 	if ratio <= 0 {
 		ratio = 1
 	}
@@ -47,6 +45,12 @@ func (s *Application) processResult(ctx context.Context, req processRunRequest) 
 	res := make([]signal.AnalysisSignal, 0, len(req.signals))
 
 	for _, sig := range req.signals {
+		if req.run.DisableRepeats {
+			if _, ok := seen[sig.Fingerprint]; ok {
+				continue
+			}
+			seen[sig.Fingerprint] = struct{}{}
+		}
 		signalIdx := sig.Index
 		startAbs := signalIdx + 1
 		if startAbs >= len(req.candles) {
@@ -57,29 +61,18 @@ func (s *Application) processResult(ctx context.Context, req processRunRequest) 
 		windowLen := barsForBuy + barsForSell
 		to := from.Add(time.Duration(windowLen) * time.Duration(minTF))
 
-		firstWindowCandleTime := sig.CandleTime.
-			Add(-time.Duration(req.interval) * time.Duration(req.detector.WindowSize()-1))
-
-		lookBackBars, err := s.fetchCandles(ctx, req.market, req.interval, firstWindowCandleTime.Add(-time.Duration(req.interval)*24), firstWindowCandleTime)
-		if err != nil {
-			return processRunResult{}, fmt.Errorf("process run result: fetch look back candles: %w", err)
-		}
-
-		if !checkLookBackByLow(lookBackBars, sig.StopLossValue) {
-			continue
-		}
-
-		tradeWindow, err := s.fetchCandles(ctx, req.market, minTF, from, to)
+		tradeWindow, err := s.fetchCandles(ctx, req.run.Market, minTF, from, to)
 		if err != nil {
 			return processRunResult{}, fmt.Errorf("process run result: fetch candles: %w", err)
 		}
 
 		resp, err := signalStatus(signalStatusRequest{
-			BarsForTrade: tradeWindow,
-			Signal:       sig.Signal,
-			BarsForBuy:   barsForBuy,
-			BarsForSell:  barsForSell,
-			Fees:         req.fees,
+			barsForTrade:    tradeWindow,
+			signal:          sig.Signal,
+			barsForBuy:      barsForBuy,
+			barsForSell:     barsForSell,
+			fees:            req.run.Fees,
+			disableStopLoss: req.run.DisableStopLoss,
 		})
 		if err != nil {
 			// если по сигналу не получилось купить — дроп
@@ -89,7 +82,7 @@ func (s *Application) processResult(ctx context.Context, req processRunRequest) 
 			return processRunResult{}, fmt.Errorf("process run result: signal status: %w", err)
 		}
 
-		sig.RunID = req.runID
+		sig.RunID = req.run.ID
 		sig.Status = resp.SignalStatus
 		sig.Signal.ExpectedReturnPPM = resp.ExpectedReturnPPM
 		sig.BuyTime = resp.BuyTime
@@ -107,19 +100,4 @@ func (s *Application) processResult(ctx context.Context, req processRunRequest) 
 		sumProfitPPM: sumProfit,
 		avgProfitPPM: avg,
 	}, nil
-}
-
-func checkLookBackByLow(lookBackBars []market.Candle, lowestLowInWindow int64) bool {
-	lowestLookBackLow := int64(math.MaxInt64)
-	for i := 0; i < len(lookBackBars); i++ {
-		if lookBackBars[i].Low < lowestLookBackLow {
-			lowestLookBackLow = lookBackBars[i].Low
-		}
-	}
-
-	if lowestLookBackLow > lowestLowInWindow {
-		return false
-	}
-
-	return true
 }

@@ -46,7 +46,7 @@ func (s *Server) NewRun(ctx context.Context, req *analysispb.NewRunRequest) (*an
 		return nil, status.Error(codes.Internal, "missing user-id in ctx")
 	}
 
-	runCfg, err := newRunFromRequestPb(req)
+	runCfg, err := newRunRequestFromProto(req)
 	if err != nil {
 		return nil, err
 	}

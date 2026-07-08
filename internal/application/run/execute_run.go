@@ -15,7 +15,7 @@ import (
 	corerun "github.com/pulsoats/core/run"
 )
 
-func (s *Application) executeRun(r run.Run, detector detect.CandleDetector, fees market.TakerMakerFees) {
+func (s *Application) executeRun(r run.Run, detector detect.CandleDetector) {
 	log := s.log.With(
 		"op", "execute_run",
 		"run_id", r.ID,
@@ -63,7 +63,7 @@ func (s *Application) executeRun(r run.Run, detector detect.CandleDetector, fees
 			return
 		}
 
-		sig, ok, err := detector.Detect(ctx, window, fees)
+		sig, ok, err := detector.Detect(ctx, window, r.Fees)
 		if err != nil {
 			fail(fmt.Errorf("detect: %w", err))
 			return
@@ -76,13 +76,10 @@ func (s *Application) executeRun(r run.Run, detector detect.CandleDetector, fees
 	log.Debug("signals detected", "count", len(signals))
 
 	res, err := s.processResult(ctx, processRunRequest{
-		runID:    r.ID,
+		run:      r,
 		signals:  signals,
 		candles:  candles,
 		detector: detector,
-		market:   r.Market,
-		interval: r.Interval,
-		fees:     fees,
 	})
 	if err != nil {
 		fail(fmt.Errorf("process result: %w", err))

@@ -163,14 +163,16 @@ func (s *Application) NewRun(ctx context.Context, req run.NewRunRequest) (run.Ru
 			LastCandleTime:  to,
 			CreatedBy:       req.UserID,
 		},
-		Fees: fees,
+		Fees:            fees,
+		DisableStopLoss: req.DisableStopLoss,
+		DisableRepeats:  req.DisableRepeats,
 	}
 
 	if err := s.runRepo.CreateRun(ctx, &r); err != nil {
 		return run.Run{}, fmt.Errorf("new run: %w", err)
 	}
 
-	go s.executeRun(r, det, fees)
+	go s.executeRun(r, det)
 
 	return r, nil
 }

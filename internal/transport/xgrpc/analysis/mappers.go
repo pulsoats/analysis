@@ -14,7 +14,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func newRunFromRequestPb(req *analysispb.NewRunRequest) (run.NewRunRequest, error) {
+func newRunRequestFromProto(req *analysispb.NewRunRequest) (run.NewRunRequest, error) {
 	if req == nil {
 		return run.NewRunRequest{}, errorsx.ErrInvalidArgument
 	}
@@ -41,11 +41,13 @@ func newRunFromRequestPb(req *analysispb.NewRunRequest) (run.NewRunRequest, erro
 			Category: req.Market.Category,
 			Symbol:   req.Market.Symbol,
 		},
-		Interval: interval,
-		From:     req.From.AsTime(),
-		To:       req.To.AsTime(),
-		Detector: detector,
-		Fees:     feesFromProto(req.Fees),
+		Interval:        interval,
+		From:            req.From.AsTime(),
+		To:              req.To.AsTime(),
+		Detector:        detector,
+		Fees:            feesFromProto(req.Fees),
+		DisableStopLoss: req.DisableStopLoss,
+		DisableRepeats:  req.DisableRepeats,
 	}, nil
 }
 
@@ -99,12 +101,12 @@ func runToProto(r run.Run) *analysispb.Run {
 				Code:    corepb.RunStatusCode(r.Status.Code),
 				Message: r.Status.Message,
 			},
-			Market:   marketSpecToProto(r.Market),
-			Interval: r.Interval.String(),
-			Detector: detectorConfigToProto(r.Detector),
+			Market:       marketSpecToProto(r.Market),
+			Interval:     r.Interval.String(),
+			Detector:     detectorConfigToProto(r.Detector),
 			SignalsCount: r.SignalsCount,
-			CreatedBy: r.CreatedBy,
-			CreatedAt: timestamppb.New(r.CreatedAt),
+			CreatedBy:    r.CreatedBy,
+			CreatedAt:    timestamppb.New(r.CreatedAt),
 		},
 		SumProfitPpm: func() int64 {
 			if r.SumProfitPPM == nil {
@@ -120,6 +122,8 @@ func runToProto(r run.Run) *analysispb.Run {
 		}(),
 		Fees: feesToProto(r.Fees),
 	}
+	runPb.DisableStopLoss = r.DisableStopLoss
+	runPb.DisableRepeats = r.DisableRepeats
 	if !r.FirstCandleTime.IsZero() {
 		runPb.BaseRun.FirstCandleTime = timestamppb.New(r.FirstCandleTime)
 	}
@@ -205,6 +209,8 @@ func runFilterFromProto(pb *analysispb.ListRunsFilter) (*run.Filter, error) {
 		MaxSignals:      pb.MaxSignals,
 		MinAvgProfitPPM: minAvgProfitPPM,
 		MaxAvgProfitPPM: maxAvgProfitPPM,
+		DisableStopLoss: pb.DisableStopLoss,
+		DisableRepeats:  pb.DisableRepeats,
 		FirstCandleFrom: firstCandleFrom,
 		LastCandleTo:    lastCandleTo,
 		CreatedFrom:     createdFrom,
