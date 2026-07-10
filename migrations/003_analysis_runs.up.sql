@@ -20,8 +20,8 @@ CREATE TABLE IF NOT EXISTS analysis.runs
     created_at        TIMESTAMPTZ          DEFAULT NOW(),
     taker_fee_ppm     BIGINT      NOT NULL,
     maker_fee_ppm     BIGINT      NOT NULL,
-    disable_stop_loss BOOLEAN     NOT NULL,
-    disable_repeats   BOOLEAN     NOT NULL,
+    disable_stop_loss BOOLEAN     NOT NULL DEFAULT FALSE,
+    disable_repeats   BOOLEAN     NOT NULL DEFAULT FALSE,
     is_shared         BOOLEAN     NOT NULL DEFAULT FALSE,
     shared_at         TIMESTAMPTZ
 );
