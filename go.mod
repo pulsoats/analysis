@@ -7,7 +7,7 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/pulsoats/contracts v1.13.1
 	github.com/pulsoats/core v1.16.4
-	github.com/pulsoats/detectors v0.0.0-20260705180917-6a91be5b8d41
+	github.com/pulsoats/detectors v0.0.0-20260710195537-4007346b478c
 	github.com/rs/zerolog v1.35.1
 	golang.org/x/sync v0.22.0
 	google.golang.org/grpc v1.82.0
@@ -21,7 +21,7 @@ require (
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	github.com/mattn/go-colorable v0.1.15 // indirect
 	github.com/mattn/go-isatty v0.0.22 // indirect
-	golang.org/x/net v0.56.0 // indirect
+	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260706201446-f0a921348800 // indirect
