@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS analysis.runs
     detector_version  TEXT        NOT NULL,
     detector_label    TEXT        NOT NULL,
     detector_opts     JSONB       NOT NULL,
-    first_candle_time TIMESTAMPTZ NOT NULL,
+    filters           JSONB       NOT NULL DEFAULT '[]'::jsonb,
     last_candle_time  TIMESTAMPTZ NOT NULL,
     signals_count     BIGINT               DEFAULT 0,
     sum_profit_ppm    BIGINT,

@@ -2,49 +2,62 @@ package catalog
 
 import (
 	"fmt"
-	"slices"
+	"sort"
 
-	"github.com/pulsoats/core/detect"
 	"github.com/pulsoats/core/detect/detector"
+	"github.com/pulsoats/core/detect/filter"
 	"github.com/pulsoats/core/exchange"
 )
 
-type Application struct {
-	detReg    *detector.Registry
-	exchanges map[string]exchange.PublicClient
+type Config struct {
+	DetectorRegistry *detector.Registry
+	FilterRegistry   *filter.Registry
+	Exchanges        map[string]exchange.PublicClient
 }
 
-func NewApplication(detectorRegistry *detector.Registry, exchanges map[string]exchange.PublicClient) (*Application, error) {
-	if detectorRegistry == nil {
-		return nil, fmt.Errorf("detector app: detector registry is nil")
+type Application struct {
+	detectorRegistry *detector.Registry
+	filterRegistry   *filter.Registry
+	exchanges        map[string]exchange.PublicClient
+}
+
+func NewApplication(cfg Config) (*Application, error) {
+	if cfg.DetectorRegistry == nil {
+		return nil, fmt.Errorf("catalog app: detector registry is nil")
+	}
+	if cfg.FilterRegistry == nil {
+		return nil, fmt.Errorf("catalog app: filter registry is nil")
+	}
+	if len(cfg.Exchanges) == 0 {
+		return nil, fmt.Errorf("catalog app: empty exchanges map")
 	}
 
 	return &Application{
-		detReg:    detectorRegistry,
-		exchanges: exchanges,
+		detectorRegistry: cfg.DetectorRegistry,
+		filterRegistry:   cfg.FilterRegistry,
+		exchanges:        cfg.Exchanges,
 	}, nil
 }
 
-// ListAvailableDetectors возвращает слайс метаданных по каждому из встроенных детекторов.
-// Метаданные берутся из реестра детекторов detector.Registry.
-func (a *Application) ListAvailableDetectors() []detect.DetectorMeta {
-	return a.detReg.ListMetas()
+func (a *Application) AvailableDetectors() []detector.Meta {
+	return a.detectorRegistry.ListMetas()
 }
 
-func (a *Application) ListAvailableExchanges() []exchange.Meta {
-	res := make([]exchange.Meta, 0, len(a.exchanges))
+func (a *Application) AvailableFilters() []filter.Meta {
+	return a.filterRegistry.ListMetas()
+}
+
+func (a *Application) AvailableExchanges() []exchange.Meta {
+	res := make([]exchange.Meta, len(a.exchanges))
+
+	i := 0
 	for _, e := range a.exchanges {
-		res = append(res, e.Meta())
+		res[i] = e.Meta()
+		i++
 	}
 
-	slices.SortFunc(res, func(a, b exchange.Meta) int {
-		if a.Code < b.Code {
-			return -1
-		}
-		if a.Code > b.Code {
-			return 1
-		}
-		return 0
+	sort.Slice(res, func(i, j int) bool {
+		return res[i].Code < res[j].Code
 	})
 
 	return res

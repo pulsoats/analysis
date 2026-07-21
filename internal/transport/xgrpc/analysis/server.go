@@ -8,6 +8,7 @@ import (
 	"errors"
 
 	"github.com/google/uuid"
+	"github.com/pulsoats/analysis/internal/application/run"
 	"github.com/pulsoats/analysis/internal/transport/xgrpc/interceptor"
 	analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
 	corepb "github.com/pulsoats/contracts/gen/go/core/v1"
@@ -19,11 +20,11 @@ import (
 
 type Server struct {
 	analysispb.UnimplementedAnalysisServer
-	app app
+	app *run.Application
 	log *slog.Logger
 }
 
-func NewServer(app app, logger *slog.Logger) (*Server, error) {
+func NewServer(app *run.Application, logger *slog.Logger) (*Server, error) {
 	if app == nil {
 		return nil, errors.New("grpc server: run app is nil")
 	}
@@ -107,7 +108,7 @@ func (s *Server) GetRunArchive(req *corepb.RunID, stream analysispb.Analysis_Get
 		} else {
 			log.Error("failed to stream run archive", "err", err)
 		}
-		return err // StreamError конвертирует в gRPC-статус
+		return err
 	}
 
 	log.Debug("run archive stream completed")

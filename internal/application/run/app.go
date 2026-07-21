@@ -13,6 +13,7 @@ import (
 	"github.com/pulsoats/analysis/internal/domain/candle"
 	"github.com/pulsoats/analysis/internal/domain/run"
 	"github.com/pulsoats/core/detect/detector"
+	"github.com/pulsoats/core/detect/filter"
 	"github.com/pulsoats/core/errorsx"
 	corerun "github.com/pulsoats/core/run"
 	"golang.org/x/sync/singleflight"
@@ -27,13 +28,14 @@ const (
 )
 
 type Config struct {
-	RunRepository     run.Repository
-	CandleRepository  candle.Repository
-	Exchanges         map[string]exchange.PublicClient
-	DetectorsRegistry *detector.Registry
-	StorageDir        string
-	Logger            *slog.Logger
-	TxManager         domain.TxManager
+	RunRepository    run.Repository
+	CandleRepository candle.Repository
+	Exchanges        map[string]exchange.PublicClient
+	DetectorRegistry *detector.Registry
+	FilterRegistry   *filter.Registry
+	StorageDir       string
+	Logger           *slog.Logger
+	TxManager        domain.TxManager
 }
 
 type Application struct {
@@ -41,6 +43,7 @@ type Application struct {
 	candleRepo  candle.Repository
 	exchanges   map[string]exchange.PublicClient
 	detRegistry *detector.Registry
+	filRegistry *filter.Registry
 	storageDir  string
 	log         *slog.Logger
 	candlesSF   singleflight.Group
@@ -57,8 +60,11 @@ func NewApplication(cfg Config) (*Application, error) {
 	if len(cfg.Exchanges) == 0 {
 		return nil, errors.New("run app: empty exchange clients map")
 	}
-	if cfg.DetectorsRegistry == nil {
+	if cfg.DetectorRegistry == nil {
 		return nil, errors.New("run app: nil detector registry")
+	}
+	if cfg.FilterRegistry == nil {
+		return nil, errors.New("run app: nil filter registry")
 	}
 	if cfg.StorageDir == "" {
 		return nil, errors.New("run app: empty storage dir")
@@ -67,88 +73,82 @@ func NewApplication(cfg Config) (*Application, error) {
 		return nil, errors.New("run app: nil tx manager")
 	}
 
-	logger := slog.Default()
-	if cfg.Logger != nil {
-		logger = cfg.Logger
+	if cfg.Logger == nil {
+		cfg.Logger = slog.Default()
 	}
 
 	return &Application{
 		runRepo:     cfg.RunRepository,
 		candleRepo:  cfg.CandleRepository,
 		exchanges:   cfg.Exchanges,
-		detRegistry: cfg.DetectorsRegistry,
+		detRegistry: cfg.DetectorRegistry,
+		filRegistry: cfg.FilterRegistry,
 		storageDir:  cfg.StorageDir,
-		log:         logger.With("component", "run.Application"),
+		log:         cfg.Logger,
 		tx:          cfg.TxManager,
 	}, nil
 }
 
-func (s *Application) NewRun(ctx context.Context, req run.NewRunRequest) (run.Run, error) {
-	s.log.Info("new run requested",
-		"user_id", req.UserID,
-		"exchange", req.Market.Exchange,
-		"category", req.Market.Category,
-		"symbol", req.Market.Symbol,
-		"interval", req.Interval,
-		"detector", req.Detector.Code,
-		"detector_version", req.Detector.Version,
-		"from", req.From,
-		"to", req.To,
-	)
+func (a *Application) NewRun(ctx context.Context, req run.NewRunRequest) (run.Run, error) {
+	const op = "new run"
 
 	if req.UserID == "" {
-		return run.Run{}, fmt.Errorf("new run: user_id: %w", errorsx.ErrRequired)
+		return run.Run{}, fmt.Errorf("%s: user_id: %w", op, errorsx.ErrRequired)
 	}
 	if req.Market.Exchange == "" || req.Market.Category == "" {
-		return run.Run{}, fmt.Errorf("new run: market exchange or/and category: %w", errorsx.ErrRequired)
+		return run.Run{}, fmt.Errorf("%s: market exchange or/and category: %w", op, errorsx.ErrRequired)
 	}
 	if req.Market.Symbol == "" {
-		return run.Run{}, fmt.Errorf("new run: market symbol: %w", errorsx.ErrRequired)
+		return run.Run{}, fmt.Errorf("%s: market symbol: %w", op, errorsx.ErrRequired)
 	}
 	if req.From.IsZero() || req.To.IsZero() {
-		return run.Run{}, fmt.Errorf("new run: time range: %w", errorsx.ErrRequired)
+		return run.Run{}, fmt.Errorf("%s: time range: %w", op, errorsx.ErrRequired)
 	}
 	if !req.From.Before(req.To) {
-		return run.Run{}, fmt.Errorf("new run: time range: %w", errorsx.ErrInvalidArgument)
+		return run.Run{}, fmt.Errorf("%s: time range: %w", op, errorsx.ErrInvalidArgument)
 	}
 	if req.Detector.Code == "" {
-		return run.Run{}, fmt.Errorf("new run: detector code: %w", errorsx.ErrRequired)
+		return run.Run{}, fmt.Errorf("%s: detector code: %w", op, errorsx.ErrRequired)
 	}
 
-	exClient, ok := s.exchanges[req.Market.Exchange]
+	exClient, ok := a.exchanges[req.Market.Exchange]
 	if !ok {
-		available := make([]string, 0, len(s.exchanges))
-		for k := range s.exchanges {
-			available = append(available, k)
-		}
-		s.log.Warn("new run: exchange not registered",
-			"requested_exchange", req.Market.Exchange,
-			"available_exchanges", available,
-		)
-		return run.Run{}, fmt.Errorf("new run: exchange %s: %w", req.Market.Exchange, errorsx.ErrNotFound)
+		return run.Run{}, fmt.Errorf("%s: exchange %s: %w", op, req.Market.Exchange, errorsx.ErrNotFound)
 	}
 
 	id, err := uuid.NewV7()
 	if err != nil {
-		return run.Run{}, fmt.Errorf("new run: uuid gen: %w", errors.Join(errorsx.ErrInternal, err))
+		return run.Run{}, fmt.Errorf("%s: uuid gen: %w", op, errors.Join(errorsx.ErrInternal, err))
 	}
 
 	fees, err := exClient.DefaultFees(req.Market.Category)
 	if err != nil {
-		return run.Run{}, fmt.Errorf("new run: %w", err)
+		return run.Run{}, fmt.Errorf("%s: %w", op, err)
 	}
 	if req.Fees != nil {
 		fees = *req.Fees
 	}
 
-	optsAny, err := s.detRegistry.UnmarshalOpts(req.Detector.Code, req.Detector.Version, req.Detector.Opts)
+	optsAny, err := a.detRegistry.UnmarshalOpts(req.Detector.Code, req.Detector.Version, req.Detector.Opts)
 	if err != nil {
-		return run.Run{}, fmt.Errorf("decode detector opts: %w", errors.Join(errorsx.ErrInternal, err))
+		return run.Run{}, fmt.Errorf("%s: decode detector opts: %w", op, errors.Join(errorsx.ErrInternal, err))
 	}
 
-	det, err := s.detRegistry.NewCandle(req.Detector.Code, req.Detector.Version, req.Detector.OptsLabel, optsAny)
+	det, err := a.detRegistry.New(req.Detector.Code, req.Detector.Version, req.Detector.OptsLabel, optsAny)
 	if err != nil {
-		return run.Run{}, fmt.Errorf("build detector: %w", errors.Join(errorsx.ErrInternal, err))
+		return run.Run{}, fmt.Errorf("%s: build detector: %w", op, errors.Join(errorsx.ErrInternal, err))
+	}
+
+	if len(req.Filters) > 0 {
+		filters := make([]filter.Filter, 0, len(req.Filters))
+		for _, cfg := range req.Filters {
+			f, err := filter.FilterFromConfig(a.filRegistry, cfg)
+			if err != nil {
+				return run.Run{}, fmt.Errorf("%s: build filter: %w", op, err)
+			}
+			filters = append(filters, f)
+		}
+		det = detector.Wrap(det, filters)
 	}
 
 	from, to := req.From.UTC(), req.To.UTC()
@@ -159,6 +159,7 @@ func (s *Application) NewRun(ctx context.Context, req run.NewRunRequest) (run.Ru
 			Market:          req.Market,
 			Interval:        req.Interval,
 			Detector:        req.Detector,
+			Filters:         req.Filters,
 			FirstCandleTime: from,
 			LastCandleTime:  to,
 			CreatedBy:       req.UserID,
@@ -168,57 +169,59 @@ func (s *Application) NewRun(ctx context.Context, req run.NewRunRequest) (run.Ru
 		DisableRepeats:  req.DisableRepeats,
 	}
 
-	if err := s.runRepo.CreateRun(ctx, &r); err != nil {
-		return run.Run{}, fmt.Errorf("new run: %w", err)
+	if err := a.runRepo.CreateRun(ctx, &r); err != nil {
+		return run.Run{}, fmt.Errorf("%s: %w", op, err)
 	}
 
-	go s.executeRun(r, det)
+	go a.executeRun(r, det)
 
 	return r, nil
 }
 
-func (s *Application) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
-	r, err := s.runRepo.RunByID(ctx, runID)
+func (a *Application) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
+	r, err := a.runRepo.RunByID(ctx, runID)
 	if err != nil {
 		return run.Run{}, fmt.Errorf("run by id: %w", err)
 	}
 	return r, nil
 }
 
-func (s *Application) StreamRunArchive(ctx context.Context, runID uuid.UUID, w io.Writer) error {
-	r, err := s.runRepo.RunByID(ctx, runID)
+func (a *Application) StreamRunArchive(ctx context.Context, runID uuid.UUID, w io.Writer) error {
+	const op = "%s"
+	r, err := a.runRepo.RunByID(ctx, runID)
 	if err != nil {
-		return fmt.Errorf("stream run archive: %w", err)
+		return fmt.Errorf("%s: %w", op, err)
 	}
 	if r.Status.Code != corerun.StatusCodeDone {
-		return fmt.Errorf("stream run archive: run %s archive is not ready: %w", runID, errorsx.ErrInvalidArgument)
+		return fmt.Errorf("%s: run %s archive is not ready: %w", op, runID, errorsx.ErrInvalidArgument)
 	}
 
-	zipPath := s.runZipPath(r.ID)
+	zipPath := a.runZipPath(r.ID)
 
 	f, err := os.Open(zipPath)
 	if err != nil {
-		return fmt.Errorf("stream run archive: open archive: %w", errors.Join(errorsx.ErrInternal, err))
+		return fmt.Errorf("%s: open archive: %w", op, errors.Join(errorsx.ErrInternal, err))
 	}
 	defer f.Close()
 
 	buf := make([]byte, 64*1024)
 	if _, err = io.CopyBuffer(w, f, buf); err != nil {
-		return fmt.Errorf("stream run result: copy archive: %w", errors.Join(errorsx.ErrInternal, err))
+		return fmt.Errorf("%s: copy archive: %w", op, errors.Join(errorsx.ErrInternal, err))
 	}
 	return nil
 }
 
-func (s *Application) ShareRun(ctx context.Context, runID uuid.UUID, callerID string) error {
-	if err := s.runRepo.ShareRun(ctx, runID, callerID); err != nil {
+func (a *Application) ShareRun(ctx context.Context, runID uuid.UUID, callerID string) error {
+	if err := a.runRepo.ShareRun(ctx, runID, callerID); err != nil {
 		return fmt.Errorf("share run: %w", err)
 	}
 	return nil
 }
 
-func (s *Application) DeleteRun(ctx context.Context, runID uuid.UUID, userID string) error {
-	err := s.tx.WithinTx(ctx, func(txCtx context.Context) error {
-		r, err := s.runRepo.RunByID(txCtx, runID)
+func (a *Application) DeleteRun(ctx context.Context, runID uuid.UUID, userID string) error {
+	const op = "delete run"
+	err := a.tx.WithinTx(ctx, func(txCtx context.Context) error {
+		r, err := a.runRepo.RunByID(txCtx, runID)
 		if err != nil {
 			return err
 		}
@@ -227,36 +230,36 @@ func (s *Application) DeleteRun(ctx context.Context, runID uuid.UUID, userID str
 			return errorsx.ErrForbidden
 		}
 
-		if err := s.runRepo.DeleteRun(txCtx, runID); err != nil {
+		if err := a.runRepo.DeleteRun(txCtx, runID); err != nil {
 			return err
 		}
 		return nil
 	})
 	if err != nil {
-		return fmt.Errorf("delete run: %w", err)
+		return fmt.Errorf("%s: %w", op, err)
 	}
 
-	err = os.Remove(s.runZipPath(runID))
+	err = os.Remove(a.runZipPath(runID))
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
 			return nil
 		}
-		return fmt.Errorf("delete run: delete archive: %w", errors.Join(errorsx.ErrInternal, err))
+		return fmt.Errorf("%s: delete archive: %w", op, errors.Join(errorsx.ErrInternal, err))
 	}
 	return nil
 }
 
-func (s *Application) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.RunsPagedResponse, error) {
+func (a *Application) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.RunsPagedResponse, error) {
 	switch {
 	case req.Limit <= 0:
 		req.Limit = defaultRunsPagedLimit
 	case req.Limit > maxRunsPagedLimit:
 		req.Limit = maxRunsPagedLimit
 	}
-	return s.runRepo.RunsPaged(ctx, req)
+	return a.runRepo.RunsPaged(ctx, req)
 }
 
-func (s *Application) runZipPath(runID uuid.UUID) string {
+func (a *Application) runZipPath(runID uuid.UUID) string {
 	filename := fmt.Sprintf("run_%s.zip", runID)
-	return filepath.Join(s.storageDir, filename)
+	return filepath.Join(a.storageDir, filename)
 }

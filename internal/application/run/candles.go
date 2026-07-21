@@ -12,55 +12,51 @@ import (
 	"github.com/pulsoats/core/market"
 )
 
-func (s *Application) fetchCandles(ctx context.Context, spec market.Spec, interval market.Interval, from, to time.Time) ([]market.Candle, error) {
+func (a *Application) fetchCandles(ctx context.Context, spec market.Spec, interval market.Interval, from, to time.Time) ([]market.Candle, error) {
+	const op = "fetch candles"
 	if !from.Before(to) {
-		return nil, fmt.Errorf("fetch candles: from %s >= to %s: %w", from, to, errorsx.ErrInvalidArgument)
+		return nil, fmt.Errorf("%s: from %s >= to %s: %w", op, from, to, errorsx.ErrInvalidArgument)
 	}
 
 	reqFrom := from.UTC().UnixMilli()
 	reqTo := to.UTC().UnixMilli()
 	sfKey := fmt.Sprintf("%v:%v:%v", candleKey(spec, interval), reqFrom, reqTo)
 
-	v, err, _ := s.candlesSF.Do(sfKey, func() (any, error) {
-		api, ok := s.exchanges[spec.Exchange]
+	v, err, _ := a.candlesSF.Do(sfKey, func() (any, error) {
+		api, ok := a.exchanges[spec.Exchange]
 		if !ok {
-			return nil, fmt.Errorf("fetch candles: exchange %s: %w", spec.Exchange, errorsx.ErrNotFound)
+			return nil, fmt.Errorf("%s: exchange %s: %w", op, spec.Exchange, errorsx.ErrNotFound)
 		}
-		return s.loadCandlesRange(ctx, api, spec, interval, from, to)
+		return a.loadCandlesRange(ctx, api, spec, interval, from, to)
 	})
 	if err != nil {
-		return nil, fmt.Errorf("fetch candles: %w", err)
+		return nil, fmt.Errorf("%s: %w", op, err)
 	}
 	return v.([]market.Candle), nil
 }
 
-func (s *Application) loadCandlesRange(ctx context.Context, api exchange.PublicClient, spec market.Spec, interval market.Interval, from time.Time, to time.Time) ([]market.Candle, error) {
+func (a *Application) loadCandlesRange(ctx context.Context, api exchange.PublicClient, spec market.Spec, interval market.Interval, from time.Time, to time.Time) ([]market.Candle, error) {
+	const op = "load candles range"
 	from = from.UTC()
 	to = to.UTC()
 	reqFrom := from.UnixMilli()
 	reqTo := to.UnixMilli()
 
-	dbCandles, err := s.candleRepo.ListByTime(ctx, spec, interval, from, to)
+	dbCandles, err := a.candleRepo.ListByTime(ctx, spec, interval, from, to)
 	if err != nil {
-		return nil, fmt.Errorf("load candles range: list candles: %w", err)
+		return nil, fmt.Errorf("%s: list candles: %w", op, err)
 	}
 
 	if len(dbCandles) == 0 {
-		s.log.Debug("candles cache miss, fetching from exchange",
-			"symbol", spec.Symbol, "interval", interval.String(),
-			"from", from, "to", to,
-		)
 		exCandles, err := api.Candles(ctx, spec, interval, from, to)
 		if err != nil {
-			return nil, fmt.Errorf("load candles range: fetch exchange candles: %w", errors.Join(errorsx.ErrInternal, err))
+			return nil, fmt.Errorf("%s: fetch exchange candles: %w", op, errors.Join(errorsx.ErrInternal, err))
 		}
-		if err := s.candleRepo.Upsert(ctx, spec, interval, exCandles); err != nil {
-			return nil, fmt.Errorf("load candles range: upsert candles: %w", err)
+		if err := a.candleRepo.Upsert(ctx, spec, interval, exCandles); err != nil {
+			return nil, fmt.Errorf("%s: upsert candles: %w", op, err)
 		}
 		return exCandles, nil
 	}
-
-	s.log.Debug("candles cache hit", "count", len(dbCandles), "symbol", spec.Symbol, "interval", interval.String())
 
 	dbFrom := dbCandles[0].Time
 	dbLast := dbCandles[len(dbCandles)-1].Time
@@ -75,10 +71,10 @@ func (s *Application) loadCandlesRange(ctx context.Context, api exchange.PublicC
 		leftFrom := from
 		exLeft, err := api.Candles(ctx, spec, interval, leftFrom, leftTo)
 		if err != nil {
-			return nil, fmt.Errorf("load candles range: fetch left range: %w", errors.Join(errorsx.ErrInternal, err))
+			return nil, fmt.Errorf("%s: fetch left range: %w", op, errors.Join(errorsx.ErrInternal, err))
 		}
-		if err := s.candleRepo.Upsert(ctx, spec, interval, exLeft); err != nil {
-			return nil, fmt.Errorf("load candles range: upsert left range: %w", err)
+		if err := a.candleRepo.Upsert(ctx, spec, interval, exLeft); err != nil {
+			return nil, fmt.Errorf("%s: upsert left range: %w", op, err)
 		}
 		left = exLeft
 	}
@@ -88,10 +84,10 @@ func (s *Application) loadCandlesRange(ctx context.Context, api exchange.PublicC
 		rightTo := to
 		exRight, err := api.Candles(ctx, spec, interval, rightFrom, rightTo)
 		if err != nil {
-			return nil, fmt.Errorf("load candles range: fetch right range: %w", errors.Join(errorsx.ErrInternal, err))
+			return nil, fmt.Errorf("%s: fetch right range: %w", errors.Join(errorsx.ErrInternal, err))
 		}
-		if err := s.candleRepo.Upsert(ctx, spec, interval, exRight); err != nil {
-			return nil, fmt.Errorf("load candles range: upsert right range: %w", err)
+		if err := a.candleRepo.Upsert(ctx, spec, interval, exRight); err != nil {
+			return nil, fmt.Errorf("%s: upsert right range: %w", op, err)
 		}
 		right = exRight
 	}
@@ -104,7 +100,7 @@ func (s *Application) loadCandlesRange(ctx context.Context, api exchange.PublicC
 
 	slice, ok := sliceCandles(merged, reqFrom, reqTo)
 	if !ok {
-		return nil, fmt.Errorf("load candles range: requested range missing: %w", errorsx.ErrInternal)
+		return nil, fmt.Errorf("%s: requested range missing: %w", op, errorsx.ErrInternal)
 	}
 
 	return slice, nil

@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"syscall"
 
+	"github.com/pulsoats/algorithms/detectors"
+	"github.com/pulsoats/algorithms/filters"
 	"github.com/pulsoats/analysis/internal/application/catalog"
 	apprun "github.com/pulsoats/analysis/internal/application/run"
 	"github.com/pulsoats/analysis/internal/infrastructure/repository/postgres"
@@ -17,7 +19,7 @@ import (
 	"github.com/pulsoats/analysis/internal/transport/xgrpc/analysis"
 	xrgpccatalog "github.com/pulsoats/analysis/internal/transport/xgrpc/catalog"
 	"github.com/pulsoats/core/detect/detector"
-	"github.com/pulsoats/detectors"
+	"github.com/pulsoats/core/detect/filter"
 	"github.com/rs/zerolog/log"
 
 	"github.com/pulsoats/analysis/internal/logger"
@@ -60,8 +62,13 @@ func main() {
 		log.Fatal().Err(err).Msg("register detectors")
 	}
 
+	filterRegistry := filter.NewRegistry()
+	if err = filters.RegisterAll(filterRegistry); err != nil {
+		log.Fatal().Err(err).Msg("register filters")
+	}
+
 	exReg := exchanges.NewRegistry(slogLogger)
-	exchangeAPIs, err := exReg.CreateAllPublic(slogLogger)
+	exchangeClients, err := exReg.CreateAllPublic(slogLogger)
 	if err != nil {
 		zlog.Fatal().Err(err).Msg("load exchange registry")
 	}
@@ -80,13 +87,14 @@ func main() {
 	}
 
 	appRunCfg := apprun.Config{
-		RunRepository:     runRepo,
-		CandleRepository:  candleRepo,
-		Exchanges:         exchangeAPIs,
-		DetectorsRegistry: detectorRegistry,
-		StorageDir:        storageDir,
-		Logger:            slogLogger,
-		TxManager:         txManager,
+		RunRepository:    runRepo,
+		CandleRepository: candleRepo,
+		Exchanges:        exchangeClients,
+		DetectorRegistry: detectorRegistry,
+		FilterRegistry:   filterRegistry,
+		StorageDir:       storageDir,
+		Logger:           slogLogger,
+		TxManager:        txManager,
 	}
 
 	runApp, err := apprun.NewApplication(appRunCfg)
@@ -99,7 +107,11 @@ func main() {
 		zlog.Fatal().Err(err)
 	}
 
-	detectorApp, err := catalog.NewApplication(detectorRegistry, exchangeAPIs)
+	detectorApp, err := catalog.NewApplication(catalog.Config{
+		DetectorRegistry: detectorRegistry,
+		FilterRegistry:   filterRegistry,
+		Exchanges:        exchangeClients,
+	})
 	if err != nil {
 		zlog.Fatal().Err(err)
 	}

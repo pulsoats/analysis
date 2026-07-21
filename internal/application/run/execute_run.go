@@ -9,14 +9,14 @@ import (
 	"github.com/pulsoats/analysis/internal/domain/run"
 	"github.com/pulsoats/analysis/internal/domain/signal"
 	"github.com/pulsoats/analysis/internal/utils/files"
-	"github.com/pulsoats/core/detect"
+	"github.com/pulsoats/core/detect/detector"
 	"github.com/pulsoats/core/errorsx"
 	"github.com/pulsoats/core/market"
 	corerun "github.com/pulsoats/core/run"
 )
 
-func (s *Application) executeRun(r run.Run, detector detect.CandleDetector) {
-	log := s.log.With(
+func (a *Application) executeRun(r run.Run, detector detector.Detector) {
+	Logger := a.log.With(
 		"op", "execute_run",
 		"run_id", r.ID,
 	)
@@ -24,35 +24,32 @@ func (s *Application) executeRun(r run.Run, detector detect.CandleDetector) {
 
 	fail := func(err error) {
 		if errors.Is(err, errorsx.ErrInternal) {
-			log.Error("run failed", "err", err)
+			Logger.Error("run failed", "err", err)
 		} else {
-			log.Warn("run failed", "err", err)
+			Logger.Warn("run failed", "err", err)
 		}
 		var msg string
 		if unwrapped := errors.Unwrap(err); unwrapped != nil {
 			msg = unwrapped.Error()
 		}
 		r.Status = corerun.Status{Code: corerun.StatusCodeFailed, Message: msg}
-		err = s.runRepo.UpdateRun(ctx, r)
+		err = a.runRepo.UpdateRun(ctx, r)
 		if err != nil {
-			log.Error(err.Error())
+			Logger.Error(err.Error())
 		}
 	}
 
 	r.Status = corerun.StatusRunning
-	err := s.runRepo.UpdateRun(ctx, r)
+	err := a.runRepo.UpdateRun(ctx, r)
 	if err != nil {
-		log.Error(err.Error())
+		Logger.Error(err.Error())
 	}
 
-	log.Info("run started")
-
-	candles, err := s.fetchCandles(ctx, r.Market, r.Interval, r.FirstCandleTime, r.LastCandleTime)
+	candles, err := a.fetchCandles(ctx, r.Market, r.Interval, r.FirstCandleTime, r.LastCandleTime)
 	if err != nil {
 		fail(err)
 		return
 	}
-	log.Debug("candles fetched", "count", len(candles))
 
 	signals := make([]signal.AnalysisSignal, 0, 128)
 	ws := detector.WindowSize()
@@ -63,7 +60,7 @@ func (s *Application) executeRun(r run.Run, detector detect.CandleDetector) {
 			return
 		}
 
-		sig, ok, err := detector.Detect(ctx, window, r.Fees)
+		sig, ok, err := detector.Detect(window, r.Fees)
 		if err != nil {
 			fail(fmt.Errorf("detect: %w", err))
 			return
@@ -73,9 +70,9 @@ func (s *Application) executeRun(r run.Run, detector detect.CandleDetector) {
 		}
 		signals = append(signals, signal.AnalysisSignal{Signal: sig, Index: i})
 	}
-	log.Debug("signals detected", "count", len(signals))
+	Logger.Debug("signals detected", "count", len(signals))
 
-	res, err := s.processResult(ctx, processRunRequest{
+	res, err := a.processResult(ctx, processRunRequest{
 		run:      r,
 		signals:  signals,
 		candles:  candles,
@@ -94,19 +91,19 @@ func (s *Application) executeRun(r run.Run, detector detect.CandleDetector) {
 	r.SumProfitPPM = &res.sumProfitPPM
 	r.AvgProfitPPM = &res.avgProfitPPM
 
-	zipPath := s.runZipPath(r.ID)
+	zipPath := a.runZipPath(r.ID)
 	if err := files.BuildZipResult(ctx, zipPath, r, candles, res.signals); err != nil {
 		fail(fmt.Errorf("build archive: %w", err))
 		return
 	}
 
 	r.Status = corerun.StatusDone
-	if err := s.runRepo.UpdateRun(ctx, r); err != nil {
+	if err := a.runRepo.UpdateRun(ctx, r); err != nil {
 		fail(err)
 		return
 	}
 
-	log.Info("run completed")
+	Logger.Info("run completed")
 }
 
 func timeBounds(candles []market.Candle) (time.Time, time.Time) {

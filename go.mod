@@ -5,9 +5,9 @@ go 1.26.2
 require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/pulsoats/contracts v1.13.1
-	github.com/pulsoats/core v1.16.4
-	github.com/pulsoats/detectors v0.0.0-20260710195537-4007346b478c
+	github.com/pulsoats/algorithms v0.0.0-20260716210110-b39225b05d70
+	github.com/pulsoats/contracts v1.13.2-0.20260721204336-0bc80844ad7e
+	github.com/pulsoats/core v1.17.0
 	github.com/rs/zerolog v1.35.1
 	golang.org/x/sync v0.22.0
 	google.golang.org/grpc v1.82.0

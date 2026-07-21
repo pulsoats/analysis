@@ -3,26 +3,41 @@ package catalog
 import (
 	catalogpb "github.com/pulsoats/contracts/gen/go/catalog/v1"
 	corepb "github.com/pulsoats/contracts/gen/go/core/v1"
-	"github.com/pulsoats/core/detect"
+	"github.com/pulsoats/core/detect/detector"
+	"github.com/pulsoats/core/detect/filter"
 	"github.com/pulsoats/core/exchange"
 )
 
-func mapToDetectorMetaPb(meta detect.DetectorMeta) *corepb.DetectorMeta {
+func mapToDetectorMetaPb(meta detector.Meta) *corepb.DetectorMeta {
 	return &corepb.DetectorMeta{
 		Code:        meta.Code,
 		Version:     meta.Version,
-		Kind:        string(meta.Kind),
 		Description: meta.Description,
 		OptsSchema:  meta.OptsSchema,
 	}
 }
 
-func mapToListAvailableDetectorsPb(metas []detect.DetectorMeta) *catalogpb.ListAvailableDetectorsResponse {
+func mapToListAvailableDetectorsPb(metas []detector.Meta) *catalogpb.ListAvailableDetectorsResponse {
 	res := make([]*corepb.DetectorMeta, 0, len(metas))
 	for _, m := range metas {
 		res = append(res, mapToDetectorMetaPb(m))
 	}
-	return &catalogpb.ListAvailableDetectorsResponse{Detectors: res}
+	return &catalogpb.ListAvailableDetectorsResponse{Metas: res}
+}
+
+func mapToFilterMetaPb(meta filter.Meta) *corepb.FilterMeta {
+	return &corepb.FilterMeta{
+		Code:        meta.Code,
+		Description: meta.Description,
+	}
+}
+
+func mapToListAvailableFiltersPb(metas []filter.Meta) *catalogpb.ListAvailableFiltersResponse {
+	res := make([]*corepb.FilterMeta, 0, len(metas))
+	for _, m := range metas {
+		res = append(res, mapToFilterMetaPb(m))
+	}
+	return &catalogpb.ListAvailableFiltersResponse{Metas: res}
 }
 
 func mapToExchangeMetaPb(meta exchange.Meta) *corepb.ExchangeMeta {
@@ -38,5 +53,5 @@ func mapToListAvailableExchangesPb(metas []exchange.Meta) *catalogpb.ListAvailab
 	for _, m := range metas {
 		res = append(res, mapToExchangeMetaPb(m))
 	}
-	return &catalogpb.ListAvailableExchangesResponse{ExchangeMetas: res}
+	return &catalogpb.ListAvailableExchangesResponse{Metas: res}
 }

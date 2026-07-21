@@ -126,8 +126,8 @@ Primary key `analysis.candles`:
 
 `pulsoats.catalog.v1.Catalog`:
 
-- `ListAvailableDetectors`
-- `ListAvailableExchanges`
+- `AvailableDetectors`
+- `AvailableExchanges`
 
 `grpc.health.v1.Health`:
 

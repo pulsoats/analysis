@@ -25,11 +25,11 @@ func (r *repo) CreateRun(ctx context.Context, run *run.Run) error {
 	const query = `
 		INSERT INTO analysis.runs (
 			id, exchange, category, symbol, interval,
-			detector_code, detector_version, detector_label, detector_opts,
+			detector_code, detector_version, detector_label, detector_opts, filters,
 			first_candle_time, last_candle_time, status_code, status_message, created_by,
 			taker_fee_ppm, maker_fee_ppm, disable_stop_loss, disable_repeats
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, $17, $18)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16, $17, $18, $19)
 		RETURNING created_at;
 	`
 
@@ -45,6 +45,7 @@ func (r *repo) CreateRun(ctx context.Context, run *run.Run) error {
 		run.Detector.Version,
 		run.Detector.OptsLabel,
 		run.Detector.Opts,
+		run.Filters,
 		run.FirstCandleTime,
 		run.LastCandleTime,
 		run.Status.Code,
@@ -103,7 +104,7 @@ func (r *repo) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
 	const query = `
 		SELECT
 			id, exchange, category, symbol, interval,
-			detector_code, detector_version, detector_label, detector_opts,
+			detector_code, detector_version, detector_label, detector_opts, filters,
 			first_candle_time, last_candle_time, signals_count, sum_profit_ppm, avg_profit_ppm,
 			taker_fee_ppm, maker_fee_ppm, disable_stop_loss, disable_repeats,
 			created_by, created_at, status_code, status_message, is_shared, shared_at
@@ -125,6 +126,7 @@ func (r *repo) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
 		&res.Detector.Version,
 		&res.Detector.OptsLabel,
 		&res.Detector.Opts,
+		&res.Filters,
 		&res.FirstCandleTime,
 		&res.LastCandleTime,
 		&res.SignalsCount,
@@ -157,7 +159,7 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 	const baseQuery = `
 	SELECT
     	id, exchange, category, symbol, interval,
-		detector_code, detector_version, detector_label, detector_opts,
+		detector_code, detector_version, detector_label, detector_opts, filters,
 		first_candle_time, last_candle_time, signals_count, sum_profit_ppm, avg_profit_ppm,
 		taker_fee_ppm, maker_fee_ppm, disable_stop_loss, disable_repeats,
 		created_by, created_at, status_code, status_message, is_shared, shared_at
@@ -325,6 +327,7 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 			&res.Detector.Version,
 			&res.Detector.OptsLabel,
 			&res.Detector.Opts,
+			&res.Filters,
 			&res.FirstCandleTime,
 			&res.LastCandleTime,
 			&res.SignalsCount,

@@ -8,7 +8,8 @@ import (
 	"github.com/pulsoats/analysis/internal/domain/run"
 	analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
 	corepb "github.com/pulsoats/contracts/gen/go/core/v1"
-	"github.com/pulsoats/core/detect"
+	"github.com/pulsoats/core/detect/detector"
+	"github.com/pulsoats/core/detect/filter"
 	"github.com/pulsoats/core/errorsx"
 	"github.com/pulsoats/core/market"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -30,7 +31,12 @@ func newRunRequestFromProto(req *analysispb.NewRunRequest) (run.NewRunRequest, e
 		return run.NewRunRequest{}, fmt.Errorf("interval %v: %w", req.Interval, errorsx.ErrInvalidArgument)
 	}
 
-	detector, err := detectorConfigFromProto(req.DetectorConfig)
+	det, err := detectorConfigFromProto(req.Detector)
+	if err != nil {
+		return run.NewRunRequest{}, err
+	}
+
+	filters, err := filtersFromProto(req.Filters)
 	if err != nil {
 		return run.NewRunRequest{}, err
 	}
@@ -44,22 +50,23 @@ func newRunRequestFromProto(req *analysispb.NewRunRequest) (run.NewRunRequest, e
 		Interval:        interval,
 		From:            req.From.AsTime(),
 		To:              req.To.AsTime(),
-		Detector:        detector,
+		Detector:        det,
+		Filters:         filters,
 		Fees:            feesFromProto(req.Fees),
 		DisableStopLoss: req.DisableStopLoss,
 		DisableRepeats:  req.DisableRepeats,
 	}, nil
 }
 
-func detectorConfigFromProto(rawDetector *corepb.DetectorConfig) (detect.DetectorConfig, error) {
+func detectorConfigFromProto(rawDetector *corepb.DetectorConfig) (detector.Config, error) {
 	if rawDetector == nil {
-		return detect.DetectorConfig{}, errorsx.ErrInvalidArgument
+		return detector.Config{}, errorsx.ErrInvalidArgument
 	}
 	if rawDetector.Code == "" {
-		return detect.DetectorConfig{}, fmt.Errorf("detector code: %w", errorsx.ErrRequired)
+		return detector.Config{}, fmt.Errorf("detector code: %w", errorsx.ErrRequired)
 	}
 
-	return detect.DetectorConfig{
+	return detector.Config{
 		Code:      rawDetector.Code,
 		Version:   rawDetector.Version,
 		OptsLabel: rawDetector.OptsLabel,
@@ -67,13 +74,38 @@ func detectorConfigFromProto(rawDetector *corepb.DetectorConfig) (detect.Detecto
 	}, nil
 }
 
-func detectorConfigToProto(det detect.DetectorConfig) *corepb.DetectorConfig {
+func detectorConfigToProto(det detector.Config) *corepb.DetectorConfig {
 	return &corepb.DetectorConfig{
 		Code:      det.Code,
 		Version:   det.Version,
 		OptsLabel: det.OptsLabel,
 		Opts:      det.Opts,
 	}
+}
+
+func filterConfigFromProto(rawFilter *corepb.FilterConfig) (filter.Config, error) {
+	if rawFilter == nil {
+		return filter.Config{}, errorsx.ErrInvalidArgument
+	}
+	if rawFilter.Code == "" {
+		return filter.Config{}, errorsx.ErrInvalidArgument
+	}
+	return filter.Config{
+		Code:   rawFilter.Code,
+		Period: int(rawFilter.Period),
+	}, nil
+}
+
+func filtersFromProto(pb []*corepb.FilterConfig) ([]filter.Config, error) {
+	out := make([]filter.Config, 0, len(pb))
+	for _, rawFilter := range pb {
+		f, err := filterConfigFromProto(rawFilter)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, nil
 }
 
 func feesFromProto(f *corepb.Fees) *market.TakerMakerFees {
