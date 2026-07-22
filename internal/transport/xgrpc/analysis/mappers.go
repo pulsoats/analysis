@@ -108,6 +108,21 @@ func filtersFromProto(pb []*corepb.FilterConfig) ([]filter.Config, error) {
 	return out, nil
 }
 
+func filterToProto(f filter.Config) *corepb.FilterConfig {
+	return &corepb.FilterConfig{
+		Code:   f.Code,
+		Period: int32(f.Period),
+	}
+}
+
+func filtersToProto(filters []filter.Config) []*corepb.FilterConfig {
+	out := make([]*corepb.FilterConfig, 0, len(filters))
+	for _, f := range filters {
+		out = append(out, filterToProto(f))
+	}
+	return out
+}
+
 func feesFromProto(f *corepb.Fees) *market.TakerMakerFees {
 	if f == nil {
 		return nil
@@ -136,6 +151,7 @@ func runToProto(r run.Run) *analysispb.Run {
 			Market:       marketSpecToProto(r.Market),
 			Interval:     r.Interval.String(),
 			Detector:     detectorConfigToProto(r.Detector),
+			Filters:      filtersToProto(r.Filters),
 			SignalsCount: r.SignalsCount,
 			CreatedBy:    r.CreatedBy,
 			CreatedAt:    timestamppb.New(r.CreatedAt),
