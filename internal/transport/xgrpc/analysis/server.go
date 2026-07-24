@@ -105,9 +105,9 @@ func (s *Server) GetRunArchive(req *corepb.RunID, stream analysispb.Analysis_Get
 		} else if errors.Is(err, errorsx.ErrInvalidArgument) {
 			log.Warn("run result not ready")
 			return status.Error(codes.FailedPrecondition, "run result not ready")
-		} else {
-			log.Error("failed to stream run archive", "err", err)
 		}
+
+		log.Error("failed to stream run archive", "err", err)
 		return err
 	}
 

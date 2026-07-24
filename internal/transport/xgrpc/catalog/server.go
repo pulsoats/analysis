@@ -24,13 +24,13 @@ func NewServer(catalogApp *catalog.Application) (*Server, error) {
 }
 
 func (s *Server) ListAvailableDetectors(_ context.Context, _ *emptypb.Empty) (*catalogpb.ListAvailableDetectorsResponse, error) {
-	return mapToListAvailableDetectorsPb(s.app.AvailableDetectors()), nil
+	return availableDetectorsToProto(s.app.AvailableDetectors()), nil
 }
 
 func (s *Server) ListAvailableFilters(_ context.Context, _ *emptypb.Empty) (*catalogpb.ListAvailableFiltersResponse, error) {
-	return mapToListAvailableFiltersPb(s.app.AvailableFilters()), nil
+	return availableFiltersToProto(s.app.AvailableFilters()), nil
 }
 
 func (s *Server) ListAvailableExchanges(_ context.Context, _ *emptypb.Empty) (*catalogpb.ListAvailableExchangesResponse, error) {
-	return mapToListAvailableExchangesPb(s.app.AvailableExchanges()), nil
+	return availableExchangesToProto(s.app.AvailableExchanges()), nil
 }

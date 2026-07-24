@@ -8,7 +8,7 @@ import (
 	"github.com/pulsoats/core/exchange"
 )
 
-func mapToDetectorMetaPb(meta detector.Meta) *corepb.DetectorMeta {
+func detectorMetaToProto(meta detector.Meta) *corepb.DetectorMeta {
 	return &corepb.DetectorMeta{
 		Code:        meta.Code,
 		Version:     meta.Version,
@@ -17,30 +17,30 @@ func mapToDetectorMetaPb(meta detector.Meta) *corepb.DetectorMeta {
 	}
 }
 
-func mapToListAvailableDetectorsPb(metas []detector.Meta) *catalogpb.ListAvailableDetectorsResponse {
+func availableDetectorsToProto(metas []detector.Meta) *catalogpb.ListAvailableDetectorsResponse {
 	res := make([]*corepb.DetectorMeta, 0, len(metas))
 	for _, m := range metas {
-		res = append(res, mapToDetectorMetaPb(m))
+		res = append(res, detectorMetaToProto(m))
 	}
 	return &catalogpb.ListAvailableDetectorsResponse{Metas: res}
 }
 
-func mapToFilterMetaPb(meta filter.Meta) *corepb.FilterMeta {
+func filterMetaToProto(meta filter.Meta) *corepb.FilterMeta {
 	return &corepb.FilterMeta{
 		Code:        meta.Code,
 		Description: meta.Description,
 	}
 }
 
-func mapToListAvailableFiltersPb(metas []filter.Meta) *catalogpb.ListAvailableFiltersResponse {
+func availableFiltersToProto(metas []filter.Meta) *catalogpb.ListAvailableFiltersResponse {
 	res := make([]*corepb.FilterMeta, 0, len(metas))
 	for _, m := range metas {
-		res = append(res, mapToFilterMetaPb(m))
+		res = append(res, filterMetaToProto(m))
 	}
 	return &catalogpb.ListAvailableFiltersResponse{Metas: res}
 }
 
-func mapToExchangeMetaPb(meta exchange.Meta) *corepb.ExchangeMeta {
+func exchangeMetaToProto(meta exchange.Meta) *corepb.ExchangeMeta {
 	return &corepb.ExchangeMeta{
 		Code:       meta.Code,
 		Intervals:  meta.Intervals,
@@ -48,10 +48,10 @@ func mapToExchangeMetaPb(meta exchange.Meta) *corepb.ExchangeMeta {
 	}
 }
 
-func mapToListAvailableExchangesPb(metas []exchange.Meta) *catalogpb.ListAvailableExchangesResponse {
+func availableExchangesToProto(metas []exchange.Meta) *catalogpb.ListAvailableExchangesResponse {
 	res := make([]*corepb.ExchangeMeta, 0, len(metas))
 	for _, m := range metas {
-		res = append(res, mapToExchangeMetaPb(m))
+		res = append(res, exchangeMetaToProto(m))
 	}
 	return &catalogpb.ListAvailableExchangesResponse{Metas: res}
 }

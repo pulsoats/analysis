@@ -25,7 +25,7 @@ func (r *repo) CreateRun(ctx context.Context, run *run.Run) error {
 	const query = `
 		INSERT INTO analysis.runs (
 			id, exchange, category, symbol, interval,
-			detector_code, detector_version, detector_label, detector_opts, filters,
+			detector_code, detector_version, detector_label, detector_opts, filters_configs,
 			first_candle_time, last_candle_time, status_code, status_message, created_by,
 			taker_fee_ppm, maker_fee_ppm, disable_stop_loss, disable_repeats
 		)
@@ -41,11 +41,11 @@ func (r *repo) CreateRun(ctx context.Context, run *run.Run) error {
 		run.Market.Category,
 		run.Market.Symbol,
 		run.Interval.String(),
-		run.Detector.Code,
-		run.Detector.Version,
-		run.Detector.OptsLabel,
-		run.Detector.Opts,
-		run.Filters,
+		run.DetectorConfig.Code,
+		run.DetectorConfig.Version,
+		run.DetectorConfig.OptsLabel,
+		run.DetectorConfig.Opts,
+		run.FiltersConfigs,
 		run.FirstCandleTime,
 		run.LastCandleTime,
 		run.Status.Code,
@@ -104,7 +104,7 @@ func (r *repo) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
 	const query = `
 		SELECT
 			id, exchange, category, symbol, interval,
-			detector_code, detector_version, detector_label, detector_opts, filters,
+			detector_code, detector_version, detector_label, detector_opts, filters_configs,
 			first_candle_time, last_candle_time, signals_count, sum_profit_ppm, avg_profit_ppm,
 			taker_fee_ppm, maker_fee_ppm, disable_stop_loss, disable_repeats,
 			created_by, created_at, status_code, status_message, is_shared, shared_at
@@ -122,11 +122,11 @@ func (r *repo) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
 		&res.Market.Category,
 		&res.Market.Symbol,
 		&interval,
-		&res.Detector.Code,
-		&res.Detector.Version,
-		&res.Detector.OptsLabel,
-		&res.Detector.Opts,
-		&res.Filters,
+		&res.DetectorConfig.Code,
+		&res.DetectorConfig.Version,
+		&res.DetectorConfig.OptsLabel,
+		&res.DetectorConfig.Opts,
+		&res.FiltersConfigs,
 		&res.FirstCandleTime,
 		&res.LastCandleTime,
 		&res.SignalsCount,
@@ -145,11 +145,11 @@ func (r *repo) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, error) {
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			return run.Run{}, fmt.Errorf("get run: %w", errorsx.ErrNotFound)
+			return run.Run{}, fmt.Errorf("run by id: %w", errorsx.ErrNotFound)
 		}
-		return run.Run{}, fmt.Errorf("get run: %w", errors.Join(errorsx.ErrInternal, err))
+		return run.Run{}, fmt.Errorf("run by id: %w", errors.Join(errorsx.ErrInternal, err))
 	}
-	if iv, ok := market.ParseInterval(interval); ok {
+	if iv, err := market.ParseInterval(interval); err == nil {
 		res.Interval = iv
 	}
 	return res, nil
@@ -159,7 +159,7 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 	const baseQuery = `
 	SELECT
     	id, exchange, category, symbol, interval,
-		detector_code, detector_version, detector_label, detector_opts, filters,
+		detector_code, detector_version, detector_label, detector_opts, filters_configs,
 		first_candle_time, last_candle_time, signals_count, sum_profit_ppm, avg_profit_ppm,
 		taker_fee_ppm, maker_fee_ppm, disable_stop_loss, disable_repeats,
 		created_by, created_at, status_code, status_message, is_shared, shared_at
@@ -223,9 +223,9 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 			argN++
 		}
 
-		if len(req.Filter.DetectorCodes) > 0 {
+		if len(req.Filter.DetectorsCodes) > 0 {
 			query += fmt.Sprintf(" AND detector_code = ANY($%d)", argN)
-			args = append(args, req.Filter.DetectorCodes)
+			args = append(args, req.Filter.DetectorsCodes)
 			argN++
 		}
 
@@ -323,11 +323,11 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 			&res.Market.Category,
 			&res.Market.Symbol,
 			&rawInterval,
-			&res.Detector.Code,
-			&res.Detector.Version,
-			&res.Detector.OptsLabel,
-			&res.Detector.Opts,
-			&res.Filters,
+			&res.DetectorConfig.Code,
+			&res.DetectorConfig.Version,
+			&res.DetectorConfig.OptsLabel,
+			&res.DetectorConfig.Opts,
+			&res.FiltersConfigs,
 			&res.FirstCandleTime,
 			&res.LastCandleTime,
 			&res.SignalsCount,
@@ -347,14 +347,14 @@ func (r *repo) RunsPaged(ctx context.Context, req run.RunsPagedRequest) (run.Run
 			return run.Run{}, err
 		}
 
-		if iv, ok := market.ParseInterval(rawInterval); ok {
+		if iv, err := market.ParseInterval(rawInterval); err == nil {
 			res.Interval = iv
 		}
 
 		return res, nil
 	})
 	if err != nil {
-		return run.RunsPagedResponse{}, fmt.Errorf("collect runs paged: %w", errors.Join(errorsx.ErrInternal, err))
+		return run.RunsPagedResponse{}, fmt.Errorf("runs paged: %w", errors.Join(errorsx.ErrInternal, err))
 	}
 
 	hasMore := len(runs) > req.Limit

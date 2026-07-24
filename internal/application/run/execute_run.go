@@ -88,8 +88,8 @@ func (a *Application) executeRun(r run.Run, detector detector.Detector) {
 	r.FirstCandleTime = fromBound
 	r.LastCandleTime = toBound
 	r.SignalsCount = signalsCount
-	r.SumProfitPPM = &res.sumProfitPPM
-	r.AvgProfitPPM = &res.avgProfitPPM
+	r.SumProfitPPM = res.sumProfitPPM
+	r.AvgProfitPPM = res.avgProfitPPM
 
 	zipPath := a.runZipPath(r.ID)
 	if err := files.BuildZipResult(ctx, zipPath, r, candles, res.signals); err != nil {

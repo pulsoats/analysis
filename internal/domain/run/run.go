@@ -25,8 +25,8 @@ type Run struct {
 	Fees            market.TakerMakerFees
 	DisableStopLoss bool
 	DisableRepeats  bool
-	SumProfitPPM    *int64
-	AvgProfitPPM    *int64
+	SumProfitPPM    int64
+	AvgProfitPPM    int64
 	IsShared        bool
 	SharedAt        *time.Time
 }
@@ -41,26 +41,25 @@ func (r Run) String() string {
 
 // Filter — параметры выборки прогонов.
 type Filter struct {
-	Exchanges     []string // market.exchange IN (...)
-	Categories    []string // market.category IN (...)
-	Symbols       []string // market.symbol   IN (...)
-	Intervals     []string // interval        IN (...)
-	DetectorCodes []string // detector.code   IN (...)
-	Statuses      []int    // status.code     IN (...), 0..4
+	Exchanges      []string
+	Categories     []string
+	Symbols        []string
+	Intervals      []string
+	DetectorsCodes []string
+	Statuses       []int
 
-	MinSignals      *int64 // signalsCount >= / <=
+	MinSignals      *int64
 	MaxSignals      *int64
-	MinAvgProfitPPM *int64 // avgProfitPPM >= / <= (перевести в PPM)
+	MinAvgProfitPPM *int64
 	MaxAvgProfitPPM *int64
 
 	DisableStopLoss *bool
 	DisableRepeats  *bool
 
-	// период свечей (колонка Period = firstCandleTime → lastCandleTime)
-	FirstCandleFrom *time.Time // first_candle_time >= FirstCandleFrom
-	LastCandleTo    *time.Time // last_candle_time  <= LastCandleTo
+	FirstCandleFrom *time.Time
+	LastCandleTo    *time.Time
 
-	CreatedFrom *time.Time // createdAt >= / <=
+	CreatedFrom *time.Time
 	CreatedTo   *time.Time
 }
 

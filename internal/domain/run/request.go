@@ -13,8 +13,8 @@ type NewRunRequest struct {
 	Interval        market.Interval
 	From            time.Time
 	To              time.Time
-	Detector        detector.Config
-	Filters         []filter.Config
+	DetectorConfig  detector.Config
+	FiltersConfigs  []filter.Config
 	Fees            *market.TakerMakerFees
 	DisableStopLoss bool
 	DisableRepeats  bool

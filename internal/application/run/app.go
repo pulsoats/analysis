@@ -107,7 +107,7 @@ func (a *Application) NewRun(ctx context.Context, req run.NewRunRequest) (run.Ru
 	if !req.From.Before(req.To) {
 		return run.Run{}, fmt.Errorf("%s: time range: %w", op, errorsx.ErrInvalidArgument)
 	}
-	if req.Detector.Code == "" {
+	if req.DetectorConfig.Code == "" {
 		return run.Run{}, fmt.Errorf("%s: detector code: %w", op, errorsx.ErrRequired)
 	}
 
@@ -129,19 +129,14 @@ func (a *Application) NewRun(ctx context.Context, req run.NewRunRequest) (run.Ru
 		fees = *req.Fees
 	}
 
-	optsAny, err := a.detRegistry.UnmarshalOpts(req.Detector.Code, req.Detector.Version, req.Detector.Opts)
-	if err != nil {
-		return run.Run{}, fmt.Errorf("%s: decode detector opts: %w", op, errors.Join(errorsx.ErrInternal, err))
-	}
-
-	det, err := a.detRegistry.New(req.Detector.Code, req.Detector.Version, req.Detector.OptsLabel, optsAny)
+	det, err := a.detRegistry.NewFromConfig(req.DetectorConfig)
 	if err != nil {
 		return run.Run{}, fmt.Errorf("%s: build detector: %w", op, errors.Join(errorsx.ErrInternal, err))
 	}
 
-	if len(req.Filters) > 0 {
-		filters := make([]filter.Filter, 0, len(req.Filters))
-		for _, cfg := range req.Filters {
+	if len(req.FiltersConfigs) > 0 {
+		filters := make([]filter.Filter, 0, len(req.FiltersConfigs))
+		for _, cfg := range req.FiltersConfigs {
 			f, err := filter.FilterFromConfig(a.filRegistry, cfg)
 			if err != nil {
 				return run.Run{}, fmt.Errorf("%s: build filter: %w", op, err)
@@ -158,8 +153,8 @@ func (a *Application) NewRun(ctx context.Context, req run.NewRunRequest) (run.Ru
 			Status:          corerun.StatusPending,
 			Market:          req.Market,
 			Interval:        req.Interval,
-			Detector:        req.Detector,
-			Filters:         req.Filters,
+			DetectorConfig:  req.DetectorConfig,
+			FiltersConfigs:  req.FiltersConfigs,
 			FirstCandleTime: from,
 			LastCandleTime:  to,
 			CreatedBy:       req.UserID,

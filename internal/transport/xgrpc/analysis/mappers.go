@@ -8,37 +8,42 @@ import (
 	"github.com/pulsoats/analysis/internal/domain/run"
 	analysispb "github.com/pulsoats/contracts/gen/go/analysis/v1"
 	corepb "github.com/pulsoats/contracts/gen/go/core/v1"
-	"github.com/pulsoats/core/detect/detector"
 	"github.com/pulsoats/core/detect/filter"
 	"github.com/pulsoats/core/errorsx"
 	"github.com/pulsoats/core/market"
+	"github.com/pulsoats/core/xgrpc"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func newRunRequestFromProto(req *analysispb.NewRunRequest) (run.NewRunRequest, error) {
+	const op = "new run request from proto"
 	if req == nil {
-		return run.NewRunRequest{}, errorsx.ErrInvalidArgument
+		return run.NewRunRequest{}, fmt.Errorf("%s: message is nil: %w", op, errorsx.ErrInvalidArgument)
 	}
 	if req.Market == nil {
-		return run.NewRunRequest{}, errorsx.ErrInvalidArgument
+		return run.NewRunRequest{}, fmt.Errorf("%s: market is nil: %w", op, errorsx.ErrInvalidArgument)
 	}
 	if req.From == nil || req.To == nil {
-		return run.NewRunRequest{}, fmt.Errorf("time range: %w", errorsx.ErrRequired)
+		return run.NewRunRequest{}, fmt.Errorf("%s: from/to time is nil: %w", op, errorsx.ErrInvalidArgument)
 	}
 
-	interval, ok := market.ParseInterval(req.Interval)
-	if !ok {
-		return run.NewRunRequest{}, fmt.Errorf("interval %v: %w", req.Interval, errorsx.ErrInvalidArgument)
+	interval, err := market.ParseInterval(req.Interval)
+	if err != nil {
+		return run.NewRunRequest{}, fmt.Errorf("%s: %w", op, err)
 	}
 
-	det, err := detectorConfigFromProto(req.Detector)
+	detectorConfig, err := xgrpc.DetectorConfigFromProto(req.DetectorConfig)
 	if err != nil {
 		return run.NewRunRequest{}, err
 	}
 
-	filters, err := filtersFromProto(req.Filters)
-	if err != nil {
-		return run.NewRunRequest{}, err
+	filtersConfigs := make([]filter.Config, 0, len(req.FiltersConfigs))
+	for _, pb := range req.FiltersConfigs {
+		f, err := xgrpc.FilterConfigFromProto(pb)
+		if err != nil {
+			return run.NewRunRequest{}, fmt.Errorf("%s: %w", op, err)
+		}
+		filtersConfigs = append(filtersConfigs, f)
 	}
 
 	return run.NewRunRequest{
@@ -50,94 +55,12 @@ func newRunRequestFromProto(req *analysispb.NewRunRequest) (run.NewRunRequest, e
 		Interval:        interval,
 		From:            req.From.AsTime(),
 		To:              req.To.AsTime(),
-		Detector:        det,
-		Filters:         filters,
-		Fees:            feesFromProto(req.Fees),
+		DetectorConfig:  detectorConfig,
+		FiltersConfigs:  filtersConfigs,
+		Fees:            xgrpc.FeesFromProto(req.Fees),
 		DisableStopLoss: req.DisableStopLoss,
 		DisableRepeats:  req.DisableRepeats,
 	}, nil
-}
-
-func detectorConfigFromProto(rawDetector *corepb.DetectorConfig) (detector.Config, error) {
-	if rawDetector == nil {
-		return detector.Config{}, errorsx.ErrInvalidArgument
-	}
-	if rawDetector.Code == "" {
-		return detector.Config{}, fmt.Errorf("detector code: %w", errorsx.ErrRequired)
-	}
-
-	return detector.Config{
-		Code:      rawDetector.Code,
-		Version:   rawDetector.Version,
-		OptsLabel: rawDetector.OptsLabel,
-		Opts:      rawDetector.Opts,
-	}, nil
-}
-
-func detectorConfigToProto(det detector.Config) *corepb.DetectorConfig {
-	return &corepb.DetectorConfig{
-		Code:      det.Code,
-		Version:   det.Version,
-		OptsLabel: det.OptsLabel,
-		Opts:      det.Opts,
-	}
-}
-
-func filterConfigFromProto(rawFilter *corepb.FilterConfig) (filter.Config, error) {
-	if rawFilter == nil {
-		return filter.Config{}, errorsx.ErrInvalidArgument
-	}
-	if rawFilter.Code == "" {
-		return filter.Config{}, errorsx.ErrInvalidArgument
-	}
-	return filter.Config{
-		Code:   rawFilter.Code,
-		Period: int(rawFilter.Period),
-	}, nil
-}
-
-func filtersFromProto(pb []*corepb.FilterConfig) ([]filter.Config, error) {
-	out := make([]filter.Config, 0, len(pb))
-	for _, rawFilter := range pb {
-		f, err := filterConfigFromProto(rawFilter)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, f)
-	}
-	return out, nil
-}
-
-func filterToProto(f filter.Config) *corepb.FilterConfig {
-	return &corepb.FilterConfig{
-		Code:   f.Code,
-		Period: int32(f.Period),
-	}
-}
-
-func filtersToProto(filters []filter.Config) []*corepb.FilterConfig {
-	out := make([]*corepb.FilterConfig, 0, len(filters))
-	for _, f := range filters {
-		out = append(out, filterToProto(f))
-	}
-	return out
-}
-
-func feesFromProto(f *corepb.Fees) *market.TakerMakerFees {
-	if f == nil {
-		return nil
-	}
-	return &market.TakerMakerFees{
-		TakerFeeRate: f.TakerFeePpm,
-		MakerFeeRate: f.MakerFeePpm,
-	}
-}
-
-func feesToProto(f market.TakerMakerFees) *corepb.Fees {
-	return &corepb.Fees{
-		TakerFeePpm: f.TakerFeeRate,
-		MakerFeePpm: f.MakerFeeRate,
-	}
 }
 
 func runToProto(r run.Run) *analysispb.Run {
@@ -148,27 +71,17 @@ func runToProto(r run.Run) *analysispb.Run {
 				Code:    corepb.RunStatusCode(r.Status.Code),
 				Message: r.Status.Message,
 			},
-			Market:       marketSpecToProto(r.Market),
-			Interval:     r.Interval.String(),
-			Detector:     detectorConfigToProto(r.Detector),
-			Filters:      filtersToProto(r.Filters),
-			SignalsCount: r.SignalsCount,
-			CreatedBy:    r.CreatedBy,
-			CreatedAt:    timestamppb.New(r.CreatedAt),
+			Market:         xgrpc.MarketSpecToProto(r.Market),
+			Interval:       r.Interval.String(),
+			DetectorConfig: xgrpc.DetectorConfigToProto(r.DetectorConfig),
+			FiltersConfigs: filtersToProto(r.FiltersConfigs),
+			SignalsCount:   r.SignalsCount,
+			CreatedBy:      r.CreatedBy,
+			CreatedAt:      timestamppb.New(r.CreatedAt),
 		},
-		SumProfitPpm: func() int64 {
-			if r.SumProfitPPM == nil {
-				return 0
-			}
-			return *r.SumProfitPPM
-		}(),
-		AvgProfitPpm: func() int64 {
-			if r.AvgProfitPPM == nil {
-				return 0
-			}
-			return *r.AvgProfitPPM
-		}(),
-		Fees: feesToProto(r.Fees),
+		SumProfitPpm: r.SumProfitPPM,
+		AvgProfitPpm: r.AvgProfitPPM,
+		Fees:         xgrpc.FeesToProto(&r.Fees),
 	}
 	runPb.DisableStopLoss = r.DisableStopLoss
 	runPb.DisableRepeats = r.DisableRepeats
@@ -197,14 +110,15 @@ func runScopeFromProto(pb analysispb.RunScope) run.Scope {
 }
 
 func runFilterFromProto(pb *analysispb.ListRunsFilter) (*run.Filter, error) {
+	const op = "run filter from proto"
 	if pb == nil {
 		return nil, nil
 	}
 
 	if len(pb.Intervals) > 0 {
 		for _, i := range pb.Intervals {
-			if _, ok := market.ParseInterval(i); !ok {
-				return nil, errorsx.ErrInvalidArgument
+			if _, err := market.ParseInterval(i); err != nil {
+				return nil, fmt.Errorf("%s: %w", op, err)
 			}
 		}
 	}
@@ -251,7 +165,7 @@ func runFilterFromProto(pb *analysispb.ListRunsFilter) (*run.Filter, error) {
 		Categories:      pb.Categories,
 		Symbols:         pb.Symbols,
 		Intervals:       pb.Intervals,
-		DetectorCodes:   pb.DetectorCodes,
+		DetectorsCodes:  pb.DetectorCodes,
 		Statuses:        statuses,
 		MinSignals:      pb.MinSignals,
 		MaxSignals:      pb.MaxSignals,
@@ -278,7 +192,7 @@ func listRunsPagedRequestFromProto(pb *analysispb.ListRunsPagedRequest) (run.Run
 
 	scope := runScopeFromProto(pb.Scope)
 
-	filter, err := runFilterFromProto(pb.Filter)
+	f, err := runFilterFromProto(pb.Filter)
 	if err != nil {
 		return run.RunsPagedRequest{}, err
 	}
@@ -288,7 +202,7 @@ func listRunsPagedRequestFromProto(pb *analysispb.ListRunsPagedRequest) (run.Run
 		BeforeID:    beforeID,
 		Scope:       scope,
 		OrderDirAsc: pb.OrderDirAsc,
-		Filter:      filter,
+		Filter:      f,
 	}, nil
 }
 
@@ -311,10 +225,10 @@ func listRunsPagedResponseToProto(resp run.RunsPagedResponse) *analysispb.ListRu
 	}
 }
 
-func marketSpecToProto(spec market.Spec) *corepb.MarketSpec {
-	return &corepb.MarketSpec{
-		Exchange: spec.Exchange,
-		Category: spec.Category,
-		Symbol:   spec.Symbol,
+func filtersToProto(filters []filter.Config) []*corepb.FilterConfig {
+	out := make([]*corepb.FilterConfig, 0, len(filters))
+	for _, f := range filters {
+		out = append(out, xgrpc.FilterConfigToProto(f))
 	}
+	return out
 }
