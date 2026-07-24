@@ -168,7 +168,7 @@ func (a *Application) NewRun(ctx context.Context, req run.NewRunRequest) (run.Ru
 		return run.Run{}, fmt.Errorf("%s: %w", op, err)
 	}
 
-	go a.executeRun(r, det)
+	go a.executeRun(r, det, req.CollectRejectLog)
 
 	return r, nil
 }
@@ -182,7 +182,7 @@ func (a *Application) RunByID(ctx context.Context, runID uuid.UUID) (run.Run, er
 }
 
 func (a *Application) StreamRunArchive(ctx context.Context, runID uuid.UUID, w io.Writer) error {
-	const op = "%s"
+	const op = "stream run archive"
 	r, err := a.runRepo.RunByID(ctx, runID)
 	if err != nil {
 		return fmt.Errorf("%s: %w", op, err)

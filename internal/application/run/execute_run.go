@@ -15,12 +15,14 @@ import (
 	corerun "github.com/pulsoats/core/run"
 )
 
-func (a *Application) executeRun(r run.Run, detector detector.Detector) {
+func (a *Application) executeRun(r run.Run, detector detector.Detector, collectRejectLog bool) {
 	Logger := a.log.With(
 		"op", "execute_run",
 		"run_id", r.ID,
 	)
 	ctx := context.Background()
+
+	var rejectLog []string
 
 	fail := func(err error) {
 		if errors.Is(err, errorsx.ErrInternal) {
@@ -60,15 +62,20 @@ func (a *Application) executeRun(r run.Run, detector detector.Detector) {
 			return
 		}
 
-		sig, ok, err := detector.Detect(window, r.Fees)
-		if err != nil {
-			fail(fmt.Errorf("detect: %w", err))
-			return
-		}
-		if !ok {
+		detRes := detector.Detect(window, r.Fees)
+		if detRes.Signal == nil {
+			if collectRejectLog {
+				logStr := fmt.Sprintf("detector: %s: opts_label: %s: candle_time: %s reason:%s",
+					detector.Code(),
+					detector.OptsLabel(),
+					time.UnixMilli(candles[i].Time).Format(time.RFC3339),
+					detRes.RejectReason,
+				)
+				rejectLog = append(rejectLog, logStr)
+			}
 			continue
 		}
-		signals = append(signals, signal.AnalysisSignal{Signal: sig, Index: i})
+		signals = append(signals, signal.AnalysisSignal{Signal: *detRes.Signal, Index: i})
 	}
 	Logger.Debug("signals detected", "count", len(signals))
 
@@ -92,7 +99,13 @@ func (a *Application) executeRun(r run.Run, detector detector.Detector) {
 	r.AvgProfitPPM = res.avgProfitPPM
 
 	zipPath := a.runZipPath(r.ID)
-	if err := files.BuildZipResult(ctx, zipPath, r, candles, res.signals); err != nil {
+	if err := files.BuildZipResult(ctx, files.BuildZipRequest{
+		ZipPath:   zipPath,
+		Run:       r,
+		Candles:   candles,
+		Signals:   signals,
+		RejectLog: rejectLog,
+	}); err != nil {
 		fail(fmt.Errorf("build archive: %w", err))
 		return
 	}

@@ -8,7 +8,7 @@
 - валидирует рынок, период, интервал, детектор и параметры комиссий;
 - получает исторические свечи из exchange clients `pulsoats/core/exchanges`;
 - кэширует свечи в таблице `analysis.candles`;
-- запускает candle-detector из registry `github.com/pulsoats/detectors`;
+- запускает детектор сигналов из registry `github.com/pulsoats/algorithms`;
 - пересчитывает результат сигналов на минимальном таймфрейме `1m`;
 - сохраняет статус, количество сигналов и среднюю доходность в `analysis.runs`;
 - собирает ZIP-архив с CSV/JSON артефактами;
@@ -23,7 +23,7 @@
 4. Прогон запускается в фоне:
    - статус меняется на `running`;
    - свечи читаются из кэша PostgreSQL или догружаются с биржи;
-   - детектор ищет сигналы на исходном интервале;
+   - детектор ищет сигналы на исходном интервале, применяются фильтры для отсеивания сигналов;
    - для найденных сигналов результат сделки считается на `1m` свечах;
    - строится ZIP-архив `run_<uuid>.zip` в `RUNS_STORAGE_DIR`;
    - статус меняется на `done` или `failed`.
@@ -100,6 +100,7 @@ GITHUB_TOKEN=... docker compose up --build
 - `status_code`, `status_message` — статус выполнения;
 - `exchange`, `category`, `symbol`, `interval` — рынок и таймфрейм;
 - `detector_code`, `detector_label`, `detector_opts` — конфигурация детектора;
+- `filters_configs` - список конфигураций фильтров;
 - `first_candle_time`, `last_candle_time` — фактические границы свечей;
 - `signals_count`, `avg_profit_ppm`, `sum_profit_ppm` — агрегированный результат;
 - `taker_fee_ppm`, `maker_fee_ppm` — комиссии прогона;

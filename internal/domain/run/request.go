@@ -9,14 +9,15 @@ import (
 )
 
 type NewRunRequest struct {
-	Market          market.Spec
-	Interval        market.Interval
-	From            time.Time
-	To              time.Time
-	DetectorConfig  detector.Config
-	FiltersConfigs  []filter.Config
-	Fees            *market.TakerMakerFees
-	DisableStopLoss bool
-	DisableRepeats  bool
-	UserID          string
+	Market           market.Spec
+	Interval         market.Interval
+	From             time.Time
+	To               time.Time
+	DetectorConfig   detector.Config
+	FiltersConfigs   []filter.Config
+	Fees             *market.TakerMakerFees
+	DisableStopLoss  bool
+	DisableRepeats   bool
+	CollectRejectLog bool
+	UserID           string
 }

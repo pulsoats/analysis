@@ -52,14 +52,15 @@ func newRunRequestFromProto(req *analysispb.NewRunRequest) (run.NewRunRequest, e
 			Category: req.Market.Category,
 			Symbol:   req.Market.Symbol,
 		},
-		Interval:        interval,
-		From:            req.From.AsTime(),
-		To:              req.To.AsTime(),
-		DetectorConfig:  detectorConfig,
-		FiltersConfigs:  filtersConfigs,
-		Fees:            xgrpc.FeesFromProto(req.Fees),
-		DisableStopLoss: req.DisableStopLoss,
-		DisableRepeats:  req.DisableRepeats,
+		Interval:         interval,
+		From:             req.From.AsTime(),
+		To:               req.To.AsTime(),
+		DetectorConfig:   detectorConfig,
+		FiltersConfigs:   filtersConfigs,
+		Fees:             xgrpc.FeesFromProto(req.Fees),
+		DisableStopLoss:  req.DisableStopLoss,
+		DisableRepeats:   req.DisableRepeats,
+		CollectRejectLog: req.CollectRejectLog,
 	}, nil
 }
 
