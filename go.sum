@@ -35,6 +35,8 @@ github.com/pulsoats/algorithms v0.0.0-20260725111137-4aed1e87925d h1:cuDoTIBSvr9
 github.com/pulsoats/algorithms v0.0.0-20260725111137-4aed1e87925d/go.mod h1:gwEI0EtwlXcKgFj3XhGOTQ+rXYScWBYGnP+8S3T8qwQ=
 github.com/pulsoats/algorithms v0.0.0-20260729100538-dfaa45ab7984 h1:7g/CNQFLSVbK8SUv0ncC5IXhcn2gZW8XM+SatdxCk+4=
 github.com/pulsoats/algorithms v0.0.0-20260729100538-dfaa45ab7984/go.mod h1:A5CiVl29Hmdt1Df0dNfdc9EEwRLMn9ofCtqonnlHelc=
+github.com/pulsoats/algorithms v0.0.0-20260730150543-fbf83550b507 h1:jYhH15+TeG0jqFOCcMeOIvqcAMnj4A+vaiUrgGpU8TY=
+github.com/pulsoats/algorithms v0.0.0-20260730150543-fbf83550b507/go.mod h1:lHbDKMlYIej45JZnYaI7AiIPWTHWegYFRuZfkNsI+IU=
 github.com/pulsoats/contracts v1.14.2 h1:6Bxm9AN93Y06vmgwwwEJn2bP/2Xo/qhXZnncQcQ9AuM=
 github.com/pulsoats/contracts v1.14.2/go.mod h1:CMCAJGI8paKd5BsXdbt3/EHg+5FvVrvxo4Qzjo7gKnY=
 github.com/pulsoats/contracts v1.14.4 h1:gsgK71a7lFhYU/cjWAc9sZxJJC29To5/0ZH6QY0UaGA=
