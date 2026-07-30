@@ -84,7 +84,7 @@ func (a *Application) loadCandlesRange(ctx context.Context, api exchange.PublicC
 		rightTo := to
 		exRight, err := api.Candles(ctx, spec, interval, rightFrom, rightTo)
 		if err != nil {
-			return nil, fmt.Errorf("%s: fetch right range: %w", errors.Join(errorsx.ErrInternal, err))
+			return nil, fmt.Errorf("%s: fetch right range: %w", op, errors.Join(errorsx.ErrInternal, err))
 		}
 		if err := a.candleRepo.Upsert(ctx, spec, interval, exRight); err != nil {
 			return nil, fmt.Errorf("%s: upsert right range: %w", op, err)

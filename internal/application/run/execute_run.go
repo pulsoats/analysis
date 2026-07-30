@@ -103,7 +103,7 @@ func (a *Application) executeRun(r run.Run, detector detector.Detector, collectR
 		ZipPath:   zipPath,
 		Run:       r,
 		Candles:   candles,
-		Signals:   signals,
+		Signals:   res.signals,
 		RejectLog: rejectLog,
 	}); err != nil {
 		fail(fmt.Errorf("build archive: %w", err))

@@ -72,8 +72,8 @@ func BuildZipResult(ctx context.Context, req BuildZipRequest) error {
 	if err != nil {
 		return fmt.Errorf("%s: add signals entry: %w", op, errors.Join(errorsx.ErrInternal, err))
 	}
-	if err := BuildSignalsCSV(ctx, sw, req.Run.ID.String(), req.Run.Market, req.Run.Interval, req.Signals); err != nil {
-		return fmt.Errorf("%s: signals csv: %w", err)
+	if err := BuildSignalsCSV(ctx, sw, req.Signals); err != nil {
+		return fmt.Errorf("%s: signals csv: %w", op, err)
 	}
 
 	mw, err := zw.Create("meta.txt")

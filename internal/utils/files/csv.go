@@ -17,7 +17,7 @@ import (
 	"github.com/pulsoats/core/market"
 )
 
-func BuildSignalsCSV(ctx context.Context, w io.Writer, runID string, spec market.Spec, interval market.Interval, signals []signal.AnalysisSignal) error {
+func BuildSignalsCSV(ctx context.Context, w io.Writer, signals []signal.AnalysisSignal) error {
 	const op = "build signals csv"
 	if len(signals) == 0 {
 		return nil
