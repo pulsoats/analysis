@@ -5,7 +5,7 @@ go 1.26.2
 require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/pulsoats/algorithms v0.0.0-20260730150842-5db70b1deee4
+	github.com/pulsoats/algorithms v0.0.0-20260730195226-de811b104c59
 	github.com/pulsoats/contracts v1.14.5
 	github.com/pulsoats/core v1.19.4
 	github.com/rs/zerolog v1.35.1
