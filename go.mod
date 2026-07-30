@@ -5,12 +5,12 @@ go 1.26.2
 require (
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.10.0
-	github.com/pulsoats/algorithms v0.0.0-20260725111137-4aed1e87925d
-	github.com/pulsoats/contracts v1.14.2
-	github.com/pulsoats/core v1.19.2
+	github.com/pulsoats/algorithms v0.0.0-20260729100538-dfaa45ab7984
+	github.com/pulsoats/contracts v1.14.5
+	github.com/pulsoats/core v1.19.4
 	github.com/rs/zerolog v1.35.1
 	golang.org/x/sync v0.22.0
-	google.golang.org/grpc v1.82.1
+	google.golang.org/grpc v1.83.0
 	google.golang.org/protobuf v1.36.11
 )
 
@@ -24,5 +24,5 @@ require (
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20260724162435-b2f20204f0df // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20260729162451-8efbd57d26e0 // indirect
 )
